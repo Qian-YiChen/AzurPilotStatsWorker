@@ -10,7 +10,7 @@ import time
 HEX = re.compile(r"^[0-9a-f]{64}$")
 
 
-def validate_source(source):
+def validate_source(source, file_bytes=10 * 1024**2, group_bytes=500 * 1024**2):
     files = source["files"]
     meta = source["metadata"]
     if not HEX.fullmatch(source["sha256"]) or not 1 <= len(files) <= 1000 or len(files) != len(meta["file_sizes"]):
@@ -18,18 +18,19 @@ def validate_source(source):
     total = 0
     digest = hashlib.sha256()
     for index, f in enumerate(files):
-        if f["index"] != index or not HEX.fullmatch(f["sha256"]) or not 0 < f["size"] <= 10 * 1024**2 or f["file_id"] <= 0 or f["size"] != meta["file_sizes"][index]:
+        if f["index"] != index or not HEX.fullmatch(f["sha256"]) or not 0 < f["size"] <= file_bytes or f["file_id"] <= 0 or f["size"] != meta["file_sizes"][index]:
             raise ValueError("Invalid source file")
         digest.update(bytes.fromhex(f["sha256"]))
         total += f["size"]
-    if total > 500 * 1024**2 or digest.hexdigest() != source["sha256"]:
+    if total > group_bytes or digest.hexdigest() != source["sha256"]:
         raise ValueError("Sample hash/size mismatch")
     if meta["project"] not in ("research", "drop"):
         raise ValueError("Unsupported project")
 
 
 class Database:
-    def __init__(self, path):
+    def __init__(self, path, file_bytes=10 * 1024**2, group_bytes=500 * 1024**2):
+        self.file_bytes, self.group_bytes = file_bytes, group_bytes
         self.lock = threading.RLock()
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
@@ -51,7 +52,7 @@ class Database:
         if batch.get("type") != "batch_ready" or batch.get("protocol_version") != 1 or not re.fullmatch(r"[0-9a-f]{32}", batch.get("batch_id", "")) or not 1 <= len(batch.get("items", [])) <= 30:
             raise ValueError("Invalid batch")
         for source in batch["items"]:
-            validate_source(source)
+            validate_source(source, self.file_bytes, self.group_bytes)
         payload = json.dumps(batch, separators=(",", ":"), sort_keys=True)
         with self.lock, self.db:
             previous = self.db.execute("SELECT payload FROM batches WHERE id=?", (batch["batch_id"],)).fetchone()
@@ -141,7 +142,7 @@ class Database:
     def enqueue_reprocess(self, cmd):
         with self.lock, self.db:
             for source in cmd["payload"]["sources"]:
-                validate_source(source)
+                validate_source(source, self.file_bytes, self.group_bytes)
                 self.db.execute("INSERT OR IGNORE INTO jobs(sha,task,source) VALUES(?,?,?)", (source["sha256"], f"command:{cmd['id']}", json.dumps(source)))
 
     def enqueue_release(self, source, release):

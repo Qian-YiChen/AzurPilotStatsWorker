@@ -15,7 +15,7 @@ from .db import validate_source
 def create_app(config=None, start_engine=True):
     config = config or Config.load()
     config.data.mkdir(parents=True, exist_ok=True)
-    db = Database(config.data / "state.sqlite")
+    db = Database(config.data / "state.sqlite", config.file_bytes, config.group_bytes)
 
     @asynccontextmanager
     async def lifespan(app):
@@ -47,7 +47,7 @@ def create_app(config=None, start_engine=True):
             raise HTTPException(401)
         try:
             source = body["source"]
-            validate_source(source)
+            validate_source(source, config.file_bytes, config.group_bytes)
             index, frame = body["file_index"], body["frame_index"]
             if type(index) is not int or type(frame) is not int or not 0 <= index < len(source["files"]) or not 0 <= frame < 10:
                 raise ValueError("Invalid frame")

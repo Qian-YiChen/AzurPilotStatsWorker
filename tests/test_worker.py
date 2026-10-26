@@ -192,3 +192,14 @@ def test_cloud_download_checks_hash_and_keeps_credentials_off_cdn(tmp_path):
         assert not path.exists()
     finally:
         pan.client.close()
+
+
+def test_configured_file_and_group_limits(tmp_path):
+    with pytest.raises(ValueError, match="source file"):
+        validate_source(source(), file_bytes=7, group_bytes=16)
+    with pytest.raises(ValueError, match="mismatch"):
+        validate_source(source(), file_bytes=8, group_bytes=7)
+    db = Database(tmp_path / "state.sqlite", file_bytes=8, group_bytes=8)
+    db.accept(batch(1))
+    assert db.pending() == 1
+    db.close()

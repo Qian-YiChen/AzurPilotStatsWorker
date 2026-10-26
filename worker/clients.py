@@ -68,7 +68,7 @@ class Pan:
                 response.raise_for_status()
                 for block in response.iter_bytes(65536):
                     size += len(block)
-                    if size > file["size"] or size > 10 * 1024**2:
+                    if size > file["size"] or size > self.config.file_bytes:
                         raise ValueError("Downloaded file exceeds expected size")
                     digest.update(block)
                     dst.write(block)
