@@ -1,0 +1,7 @@
+# Copy outside Git and replace placeholders with your existing tunnel values.
+tunnel: YOUR_TUNNEL_UUID
+credentials-file: /etc/cloudflared/YOUR_TUNNEL_UUID.json
+ingress:
+  - hostname: recognizer.example.com
+    service: http://127.0.0.1:8091
+  - service: http_status:404
