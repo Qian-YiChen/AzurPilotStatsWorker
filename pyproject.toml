@@ -7,6 +7,7 @@ dependencies = [
     "fastapi>=0.115,<1",
     "uvicorn[standard]>=0.34,<1",
     "httpx>=0.28,<1",
+    "websockets>=17,<18",
     "numpy>=2,<3",
     "pillow>=11,<13",
     "rich>=13,<15",

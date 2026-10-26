@@ -24,7 +24,11 @@ uv run --env-file .env python -m worker.app
 
 需要 Python 3.12+。`ALAS_ROOT` 指向可用的 AzurLaneAutoScript/AzurPilot 工作目录，包含 `module/`、`assets/` 和本地 OCR 模型；`ALAS_PYTHON` 指向已安装该客户端依赖的解释器，Windows 例如 `../AzurLaneAutoScript/.venv/Scripts/python.exe`。识别在独立子进程执行，不启动游戏或设备自动化。请固定客户端版本并先跑真实适配测试，更新客户端后重新验证。
 
-设置 `WORKER_TOKEN` 与 A 相同，`STATISTICS_TOKEN` 与 C 相同。填写 123 盘开放平台凭据和 C 地址。通过 `deploy/cloudflared.example.yml` 对已有 Tunnel 配置公开 B 的本地端口。WebSocket 地址为 `wss://recognizer.example.com/internal/v1/batches`，必须携带 `Authorization: Bearer <WORKER_TOKEN>`。默认监听本机，不直接公开裸端口；如启用 Cloudflare Access，A 还需配置服务令牌，C 的原图预览链路也须获准通过 Access。
+设置 `WORKER_TOKEN` 与 A 相同，`STATISTICS_TOKEN` 与 C 相同。填写 123 盘开放平台凭据和 C 地址。配置 `UPLOADER_WS_URL=wss://上传域名/internal/v1/worker/connect`，由 B 主动连接 A，A 按半小时时段推送已上传的样本。B 提交 SQLite 后才确认；断线每 5 秒重连，重复批次复用已有任务。健康检查的 `uploader_connected` 表示连接状态。
+
+A 只有 HTTP/NAT 入口时，使用 SSH 转发加密传输（见 [部署示例](deploy/reverse-ssh.md)），将 URL 指向本机 `ws://127.0.0.1:18092/internal/v1/worker/connect`。B 容器使用 Linux host 网络并监听 `127.0.0.1:8091` 才能访问宿主机转发端口；标准桥接网络不能通过容器 loopback 访问宿主机。不要在公网明文 WS 中发送节点令牌。
+
+通过 `deploy/cloudflared.example.yml` 公开 B 本机 HTTP 端口，供 C 原图预览。兼容的 `/internal/v1/batches` 仍接收旧版 A 主动连接，要求相同 Bearer 认证；反向模式无需 A 访问 B 的 Cloudflare 域名。默认监听本机，不公开裸端口。
 
 **每个 DATA_DIR 只运行一个进程、一个识别执行器。** 不要启动多个 uvicorn worker。生产应使用进程管理器重启服务，并限制日志大小。
 
@@ -44,7 +48,7 @@ C 离线时保留结构化结果和小候选图，重传不重复 OCR。C 接收
 
 未知物品自动裁剪 49×49 图标，附源文件、帧、槽位和坐标。候选需要在 C 后台人工命名分类；不会猜测其语义。缺失模板、项目或数量异常产生 `needs_review`，不进入正式统计。
 
-每 30 秒同步 C 心跳、模板和指令；发布包校验 SHA-256，任务固定使用开始时的版本。试识别使用草稿且不入统计。发布、回滚和手动重处理独立于 A 的 30 份门槛。`POST /internal/v1/preview` 仅供 C 认证调用，按需下载并返回一帧，响应后删除临时文件。
+每 30 秒同步 C 心跳、模板和指令；发布包校验 SHA-256，任务固定使用开始时的版本。试识别使用草稿且不入统计。发布、回滚和手动重处理独立于 A 的半小时调度。`POST /internal/v1/preview` 仅供 C 认证调用，按需下载并返回一帧，响应后删除临时文件。
 
 ## 验证
 

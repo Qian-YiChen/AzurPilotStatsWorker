@@ -48,6 +48,7 @@ dependencies = [
     { name = "requests" },
     { name = "rich" },
     { name = "uvicorn", extra = ["standard"] },
+    { name = "websockets" },
 ]
 
 [package.optional-dependencies]
@@ -91,6 +92,7 @@ requires-dist = [
     { name = "rich", specifier = ">=13,<15" },
     { name = "scipy", marker = "extra == 'ocr'", specifier = "==1.18.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34,<1" },
+    { name = "websockets", specifier = ">=17,<18" },
 ]
 provides-extras = ["ocr"]
 

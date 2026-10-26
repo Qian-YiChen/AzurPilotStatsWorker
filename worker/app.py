@@ -10,25 +10,30 @@ from .config import Config
 from .db import Database
 from .engine import Engine
 from .db import validate_source
+from .uploader import UploaderConnection
 
 
 def create_app(config=None, start_engine=True):
     config = config or Config.load()
     config.data.mkdir(parents=True, exist_ok=True)
     db = Database(config.data / "state.sqlite", config.file_bytes, config.group_bytes)
+    uploader = UploaderConnection(config, db)
 
     @asynccontextmanager
     async def lifespan(app):
         engine = Engine(config, db) if start_engine else None
         app.state.engine = engine
         task = asyncio.create_task(engine.run()) if engine else None
+        connection = asyncio.create_task(uploader.run()) if config.uploader_url else None
         try:
             yield
         finally:
-            if task:
-                task.cancel()
+            for running in (connection, task):
+                if not running:
+                    continue
+                running.cancel()
                 try:
-                    await task
+                    await running
                 except asyncio.CancelledError:
                     pass
             db.close()
@@ -73,7 +78,7 @@ def create_app(config=None, start_engine=True):
 
     @app.get("/healthz")
     def health():
-        return {"status": "ok", "pending": db.pending()}
+        return {"status": "ok", "pending": db.pending(), "uploader_connected": uploader.connected}
 
     @app.websocket("/internal/v1/batches")
     async def receiver(ws: WebSocket):
