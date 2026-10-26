@@ -75,7 +75,7 @@ def create_app(config=None, start_engine=True):
     def health():
         return {"status": "ok", "pending": db.pending()}
 
-    @app.websocket("/internal/v1/worker/ws")
+    @app.websocket("/internal/v1/batches")
     async def receiver(ws: WebSocket):
         if not config.worker_token or not hmac.compare_digest(ws.headers.get("authorization", ""), "Bearer " + config.worker_token):
             await ws.close(code=1008)

@@ -30,9 +30,9 @@ def test_ack_requires_auth_and_durable_acceptance(tmp_path):
     path = tmp_path / "state.sqlite"
     with TestClient(create_app(config(tmp_path), start_engine=False)) as client:
         with pytest.raises(Exception):
-            with client.websocket_connect("/internal/v1/worker/ws"):
+            with client.websocket_connect("/internal/v1/batches"):
                 pass
-        with client.websocket_connect("/internal/v1/worker/ws", headers={"Authorization": "Bearer worker-secret"}) as ws:
+        with client.websocket_connect("/internal/v1/batches", headers={"Authorization": "Bearer worker-secret"}) as ws:
             ws.send_json(batch())
             assert ws.receive_json() == {"type": "batch_accepted", "batch_id": "a" * 32}
             ws.send_json(batch())
