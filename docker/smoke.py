@@ -40,6 +40,34 @@ def main():
         assert second["status"] == "complete", second
         assert second["events"][0]["items"] == [{"item": "ImageSmokeBlueprint", "amount": 1, "tag": ""}], second
         assert second["used_templates"] == [candidate["id"]], second
+
+        # Operation Siren uses its own grids and sums equal drops from distinct
+        # frames. The generic reward-page overlap merger must not remove them.
+        request["source"]["metadata"]["scene"] = "opsi_meowfficer_farming"
+        request["files"] = [str(screenshot), str(screenshot)]
+        opsi = parse()
+        assert opsi["status"] == "complete", opsi
+        assert opsi["events"][0]["items"] == [{"item": "ImageSmokeBlueprint", "amount": 2, "tag": "log"}], opsi
+        assert opsi["events"][0]["hazard_level"] == 0, opsi
+
+        # Unknown file-only scenes are retained for review, not guessed into a
+        # random statistics project.
+        request["source"]["metadata"]["scene"] = "legacy_auto"
+        ambiguous = parse()
+        assert ambiguous["status"] == "needs_review", ambiguous
+        assert "legacy_scene_requires_classification" in ambiguous["diagnostics"], ambiguous
+
+        sys.path.insert(0, str(root))
+        os.chdir(root)
+        sys.path.insert(0, str(adapter.parent))
+        import numpy as np
+        from recognize import research_focus
+        focused = np.zeros((720, 1280, 3), dtype=np.uint8)
+        focused[652:690, 821:859] = (41, 50, 57)
+        assert research_focus(focused, [9, 9, 9, 8, 7]) == 9
+        assert research_focus(focused, [9, 9, 8, 8, 7]) == 0
+        focused[652:690, 821:859] = (255, 255, 255)
+        assert research_focus(focused, [9, 9, 9, 8, 7]) == 0
     print("Offline OCR and template smoke test passed")
 
 
