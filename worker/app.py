@@ -106,6 +106,8 @@ def create_app(config=None, start_engine=True):
 def main():
     import uvicorn
     logging.basicConfig(level=logging.INFO)
+    # Download redirects contain temporary cloud credentials in their URLs.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     uvicorn.run(create_app(), host=os.getenv("LISTEN_HOST", "127.0.0.1"), port=int(os.getenv("LISTEN_PORT", "8091")), ws_max_size=16 * 1024**2, ws_ping_interval=25, ws_ping_timeout=10)
 
 
