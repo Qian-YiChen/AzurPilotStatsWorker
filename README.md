@@ -4,6 +4,18 @@
 
 ## 安装与启动
 
+推荐使用自带识别环境的 Docker 镜像：
+
+```sh
+# 复制 .env.example 为 .env，填写节点令牌、C 地址和 123 盘凭据。
+docker compose pull
+docker compose up -d
+```
+
+镜像 `ghcr.io/wess09/azurpilotstatsworker:latest` 包含 Python、OCR 依赖、基础模板和模型。Dockerfile 固定使用公开客户端提交 `d0ce990caf24b821e4250909ada78016f95d31d0`，其源码与许可证位于镜像 `/opt/alas/`；构建不读取宿主机客户端目录或配置。每次镜像构建都在断网条件下验证真实 OCR、候选提取和模板补齐。
+
+Compose 自动设置容器内 `ALAS_ROOT / ALAS_PYTHON` 和监听地址，不需要挂载宿主机 Python 环境。任务和结构化结果保存在 `worker-state` 卷，删除容器不会丢失。`WORKER_IMAGE` 可指定版本；支持 `latest / main / sha-<完整提交号>`，`v*` 标签发布版本镜像。原生开发仍可使用：
+
 ```sh
 uv sync --locked
 # 复制 .env.example 为 .env 并填写配置，由 uv 加载环境：

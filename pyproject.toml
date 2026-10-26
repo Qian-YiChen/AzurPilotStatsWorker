@@ -3,7 +3,32 @@ name = "azurpilot-stats-worker"
 version = "0.1.0"
 description = "Durable screenshot recognition worker for AzurPilot"
 requires-python = ">=3.12"
-dependencies = ["fastapi>=0.115,<1", "uvicorn[standard]>=0.34,<1", "httpx>=0.28,<1", "numpy>=2,<3", "opencv-python-headless>=4.11,<5", "pillow>=11,<13", "rich>=13,<15", "requests>=2.32,<3", "pyyaml>=6,<7", "lz4>=4.4,<5", "psutil>=7,<8"]
+dependencies = [
+    "fastapi>=0.115,<1",
+    "uvicorn[standard]>=0.34,<1",
+    "httpx>=0.28,<1",
+    "numpy>=2,<3",
+    "pillow>=11,<13",
+    "rich>=13,<15",
+    "requests>=2.32,<3",
+    "pyyaml>=6,<7",
+    "lz4>=4.4,<5",
+    "psutil>=7,<8",
+]
+
+[project.optional-dependencies]
+ocr = [
+    "cached-property>=2,<3",
+    "imageio==2.26.0",
+    "inflection==0.5.1",
+    "jellyfish>=1.2,<2",
+    "lxml>=5,<7",
+    "onnxruntime==1.27.0",
+    "packaging>=24,<27",
+    "portalocker>=3.2,<4",
+    "rapidocr==3.9.0",
+    "scipy==1.18.0",
+]
 
 [dependency-groups]
 dev = ["pytest>=8,<10"]

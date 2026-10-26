@@ -1,0 +1,20 @@
+services:
+  recognizer:
+    image: ${WORKER_IMAGE:-ghcr.io/wess09/azurpilotstatsworker:latest}
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+      ALAS_ROOT: /opt/alas
+      ALAS_PYTHON: /app/.venv/bin/python
+      LISTEN_HOST: 0.0.0.0
+      LISTEN_PORT: "8091"
+    ports: ["127.0.0.1:8091:8091"]
+    volumes: ["worker-state:/data"]
+    stop_grace_period: 12m
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+volumes:
+  worker-state:
