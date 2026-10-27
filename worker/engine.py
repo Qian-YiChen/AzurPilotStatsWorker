@@ -15,6 +15,22 @@ from .pool import RecognizerPool, automatic_workers
 log = logging.getLogger(__name__)
 
 
+def needs_template_retry(result, previous, current):
+    if result.get('candidate_ids') or any(d == 'missing_template' or d.startswith('missing_template:')
+                                          for d in result.get('diagnostics', [])):
+        return True
+    used = result.get('used_templates', [])
+    if not used:
+        return False
+    if previous is None:
+        # A saved delivery from an older process has no in-memory snapshot.
+        return True
+    fields = ('item_id', 'scene', 'enabled', 'image')
+    old = {t['id']: tuple(t.get(k) for k in fields) for t in previous}
+    new = {t['id']: tuple(t.get(k) for k in fields) for t in current}
+    return any(old.get(id_) != new.get(id_) for id_ in used)
+
+
 class Engine:
     def __init__(self, config, db):
         self.config = config
@@ -76,6 +92,7 @@ class Engine:
     def process(self, job):
         try:
             source = json.loads(job["source"])
+            templates = None
             if job["state"] != "delivery":
                 revision = self.stats.revision(source["sha256"]) + 1
                 release_id, templates = self.db.release()
@@ -101,8 +118,8 @@ class Engine:
                 self.db.finish(job)
                 log.info("Result delivered sha=%s revision=%s status=%s", source["sha256"],
                          result["revision"], result["status"])
-                active = self.db.setting("release_id", 0)
-                if active != result["template_release"]:
+                active, current_templates = self.db.release()
+                if active != result["template_release"] and needs_template_retry(result, templates, current_templates):
                     # Publication may race an in-flight first result, before C
                     # knows that source. It must not miss the new template pass.
                     self.db.enqueue_release(source, active)

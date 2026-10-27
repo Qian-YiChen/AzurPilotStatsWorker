@@ -10,8 +10,22 @@ import pytest
 
 from worker.db import Database
 from worker.engine import Engine
+from worker.engine import needs_template_retry
 from worker.pool import RecognizerPool
 from test_worker import batch, config, source
+
+
+def test_publication_does_not_retry_unrelated_parser_failures_or_templates():
+    old = [{'id':'a','item_id':'Coins','scene':'all','enabled':True,'image':'icon','name':'old'}]
+    new = old + [{'id':'b','item_id':'NewItem','scene':'all','enabled':True,'image':'new'}]
+    failed = {'diagnostics':['no_complete_reward_frame'],'candidate_ids':[],'used_templates':[]}
+    assert not needs_template_retry(failed, old, new)
+    used = {**failed,'used_templates':['a']}
+    assert not needs_template_retry(used, old, new)
+    assert not needs_template_retry(used, old, [{**old[0],'name':'display-only'}])
+    assert needs_template_retry(used, old, [{**old[0],'item_id':'CorrectedItem'}])
+    assert needs_template_retry(used, old, [])
+    assert needs_template_retry({**failed,'candidate_ids':['unknown']},old,new)
 
 
 def test_parallel_claims_keep_delivery_and_same_source_exclusive(tmp_path):
