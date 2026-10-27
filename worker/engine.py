@@ -5,12 +5,12 @@ import logging
 import os
 from pathlib import Path
 import shutil
-import subprocess
-import sys
+import threading
 import tempfile
 import time
 
 from .clients import Pan, Statistics, WebDAV
+from .pool import RecognizerPool, automatic_workers
 
 log = logging.getLogger(__name__)
 
@@ -30,18 +30,31 @@ class Engine:
                 shutil.rmtree(path)
             else:
                 path.unlink()
-        self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="recognition")
+        self.workers = config.recognition_workers or automatic_workers()
+        self.job_slots = self.workers + (config.prefetch_jobs or max(1, self.workers // 2))
+        self.executor = ThreadPoolExecutor(max_workers=self.job_slots, thread_name_prefix="recognition")
+        self.recognizers = RecognizerPool(self.workers, config.ocr_threads)
+        self.disk_lock = threading.Lock()
+        self.disk_reserved = 0
+        log.info('Recognition lanes=%s job_slots=%s threads_per_process=%s mode=resident',
+                 self.workers, self.job_slots, config.ocr_threads)
 
     def recognize(self, source, templates=None):
         with tempfile.TemporaryDirectory(dir=self.work) as temporary:
             directory = Path(temporary)
             paths = []
             for file in source["files"]:
-                if shutil.disk_usage(self.work).free < file["size"] + 128 * 1024**2:
-                    raise RuntimeError("Insufficient B working disk space")
+                with self.disk_lock:
+                    if shutil.disk_usage(self.work).free - self.disk_reserved < file['size'] + 128 * 1024**2:
+                        raise RuntimeError('Insufficient B working disk space')
+                    self.disk_reserved += file['size']
                 path = directory / f"{file['index']}.png"
                 started = time.monotonic()
-                self.pan.download(file, path)
+                try:
+                    self.pan.download(file, path)
+                finally:
+                    with self.disk_lock:
+                        self.disk_reserved -= file['size']
                 log.info("Original downloaded sha=%s index=%s bytes=%s seconds=%.3f transport=%s",
                          source["sha256"], file["index"], file["size"], time.monotonic() - started,
                          "webdav" if self.config.webdav_url else "openapi")
@@ -50,9 +63,9 @@ class Engine:
             input_path = directory / "input.json"
             output_path = directory / "output.json"
             input_path.write_text(json.dumps(request), encoding="utf-8")
-            python = os.getenv("ALAS_PYTHON", sys.executable)
             started = time.monotonic()
-            subprocess.run([python, str(Path(__file__).with_name("recognize.py")), str(input_path), str(output_path)], check=True, timeout=int(os.getenv("RECOGNITION_TIMEOUT", "600")), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self.recognizers.recognize(input_path, output_path, source['metadata']['server'],
+                                       timeout=int(os.getenv('RECOGNITION_TIMEOUT', '600')))
             if output_path.stat().st_size > 8 * 1024**2:
                 raise ValueError("Recognition output is too large")
             parsed = json.loads(output_path.read_text(encoding="utf-8"))
@@ -134,6 +147,37 @@ class Engine:
 
     async def run(self):
         loop = asyncio.get_running_loop()
+        async def execute(function, *args):
+            future = loop.run_in_executor(self.executor, function, *args)
+            try:
+                return await asyncio.shield(future)
+            except asyncio.CancelledError:
+                await future  # Drain leases/results before closing SQLite or HTTP.
+                raise
+
+        async def consume():
+            while True:
+                job = self.db.claim()
+                if job:
+                    await execute(self.process, job)
+                else:
+                    await asyncio.sleep(0.1)
+
+        async def controls():
+            while True:
+                command = self.db.command()
+                if command:
+                    # The default executor keeps template commands independent
+                    # of bounded ingestion/prefetch lanes.
+                    future = loop.run_in_executor(None, self.control, command)
+                    try:
+                        await asyncio.shield(future)
+                    except asyncio.CancelledError:
+                        await future
+                        raise
+                else:
+                    await asyncio.sleep(0.1)
+
         async def management():
             while True:
                 try:
@@ -146,24 +190,15 @@ class Engine:
                 except Exception:
                     log.exception("C control sync failed")
                 await asyncio.sleep(30)
-        management_task = asyncio.create_task(management())
+        tasks = [asyncio.create_task(management()), asyncio.create_task(controls())]
+        tasks.extend(asyncio.create_task(consume()) for _ in range(self.job_slots))
         try:
-            while True:
-                command = self.db.command()
-                if command:
-                    await loop.run_in_executor(self.executor, self.control, command)
-                    continue
-                job = self.db.claim()
-                if job:
-                    await loop.run_in_executor(self.executor, self.process, job)
-                else:
-                    await asyncio.sleep(0.5)
+            await asyncio.shield(asyncio.gather(*tasks))
         finally:
-            management_task.cancel()
-            try:
-                await management_task
-            except asyncio.CancelledError:
-                pass
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
             self.executor.shutdown(wait=True)
+            self.recognizers.close()
             self.stats.client.close()
             self.pan.client.close()

@@ -78,7 +78,10 @@ def create_app(config=None, start_engine=True):
 
     @app.get("/healthz")
     def health():
-        return {"status": "ok", "pending": db.pending(), "uploader_connected": uploader.connected}
+        engine = getattr(app.state, 'engine', None)
+        return {"status": "ok", "pending": db.pending(), "uploader_connected": uploader.connected,
+                "recognition_workers": engine.workers if engine else 0,
+                "job_slots": engine.job_slots if engine else 0}
 
     @app.websocket("/internal/v1/batches")
     async def receiver(ws: WebSocket):

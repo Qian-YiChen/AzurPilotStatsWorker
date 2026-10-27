@@ -20,8 +20,13 @@ class Config:
     webdav_url: str = ""
     webdav_username: str = field(default="", repr=False)
     webdav_password: str = field(default="", repr=False)
+    recognition_workers: int = 0
+    ocr_threads: int = 1
+    prefetch_jobs: int = 0
 
     def __post_init__(self):
+        if not 0 <= self.recognition_workers <= 32 or not 1 <= self.ocr_threads <= 16 or not 0 <= self.prefetch_jobs <= 32:
+            raise ValueError('Invalid recognition concurrency')
         if self.file_bytes < 8 or self.group_bytes < self.file_bytes:
             raise ValueError("Invalid file/group limits")
         if self.uploader_url:
@@ -43,4 +48,4 @@ class Config:
         missing = [k for k in required if not os.getenv(k)]
         if missing:
             raise ValueError("Missing configuration: " + ", ".join(missing))
-        return cls(Path(os.getenv("DATA_DIR", "data")).resolve(), os.environ["WORKER_TOKEN"], os.environ["STATISTICS_URL"].rstrip("/"), os.environ["STATISTICS_TOKEN"], os.getenv("WORKER_ID", "recognizer-1"), os.getenv("PAN_CLIENT_ID", ""), os.getenv("PAN_CLIENT_SECRET", ""), os.getenv("PAN_API_BASE", "https://open-api.123pan.com"), Path(os.environ["ALAS_ROOT"]).resolve(), int(os.getenv("MAX_FILE_BYTES", str(10 * 1024**2))), int(os.getenv("MAX_GROUP_BYTES", str(500 * 1024**2))), os.getenv("UPLOADER_WS_URL", ""), os.getenv("WEBDAV_URL", "").rstrip("/"), os.getenv("WEBDAV_USERNAME", ""), os.getenv("WEBDAV_PASSWORD", ""))
+        return cls(Path(os.getenv("DATA_DIR", "data")).resolve(), os.environ["WORKER_TOKEN"], os.environ["STATISTICS_URL"].rstrip("/"), os.environ["STATISTICS_TOKEN"], os.getenv("WORKER_ID", "recognizer-1"), os.getenv("PAN_CLIENT_ID", ""), os.getenv("PAN_CLIENT_SECRET", ""), os.getenv("PAN_API_BASE", "https://open-api.123pan.com"), Path(os.environ["ALAS_ROOT"]).resolve(), int(os.getenv("MAX_FILE_BYTES", str(10 * 1024**2))), int(os.getenv("MAX_GROUP_BYTES", str(500 * 1024**2))), os.getenv("UPLOADER_WS_URL", ""), os.getenv("WEBDAV_URL", "").rstrip("/"), os.getenv("WEBDAV_USERNAME", ""), os.getenv("WEBDAV_PASSWORD", ""), int(os.getenv('RECOGNITION_WORKERS', '0')), int(os.getenv('OCR_THREADS', '1')), int(os.getenv('PREFETCH_JOBS', '0')))

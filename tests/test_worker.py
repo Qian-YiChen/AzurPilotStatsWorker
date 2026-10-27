@@ -110,7 +110,7 @@ def test_work_files_removed_even_when_recognizer_fails(tmp_path, monkeypatch):
             path.write_bytes(b"original")
 
     engine.pan = Pan()
-    monkeypatch.setattr("worker.engine.subprocess.run", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("recognizer crashed")))
+    monkeypatch.setattr(engine.recognizers, 'recognize', lambda *a, **k: (_ for _ in ()).throw(RuntimeError("recognizer crashed")))
     with pytest.raises(RuntimeError):
         engine.recognize(source())
     assert list(engine.work.iterdir()) == []

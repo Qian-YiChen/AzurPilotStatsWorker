@@ -10,6 +10,35 @@ import os
 from pathlib import Path
 import sys
 import traceback
+from functools import lru_cache
+
+
+_template_cache_installed = False
+
+
+def cache_base_templates(item_grid):
+    global _template_cache_installed
+    if _template_cache_installed:
+        return
+    original = item_grid.load_template_folder
+
+    @lru_cache(maxsize=8)
+    def load(folder, area):
+        grid = item_grid(None, {}, template_area=area)
+        original(grid, folder)
+        return grid.templates, grid.colors, grid.next_template_index
+
+    def cached(self, folder):
+        templates, colors, next_index = load(str(folder), tuple(self.template_area))
+        for name, template in templates.items():
+            if name not in self.templates:
+                self.templates[name] = template
+                self.colors[name] = colors[name]
+                self.templates_hit[name] = 0
+        self.next_template_index = max(self.next_template_index, next_index)
+
+    item_grid.load_template_folder = cached
+    _template_cache_installed = True
 
 
 def research_focus(image, series_list):
@@ -35,7 +64,8 @@ def frames(paths, diagnostics):
 
 def recognize(request):
     root = Path(request["alas_root"]).resolve()
-    sys.path.insert(0, str(root))
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
     os.chdir(root)
     import cv2
     import numpy as np
@@ -45,6 +75,8 @@ def recognize(request):
     from module.statistics.get_items import GetItemsStatistics
     from module.statistics.item import ItemGrid
     from module.statistics.research_drop import ResearchDropParser
+    cache_base_templates(ItemGrid)
+    cv2.setNumThreads(int(os.getenv('OCR_THREADS', '1')))
 
     source = request["source"]
     meta = dict(source["metadata"])
@@ -214,11 +246,26 @@ def recognize(request):
     return {"events": events, "metadata_overrides": overrides, "diagnostics": diagnostics, "candidates": candidates, "used_templates": sorted(used), "status": "needs_review" if diagnostics or not events else "complete"}
 
 
-if __name__ == "__main__":
-    request_path, output_path = sys.argv[1:3]
+def run_request(request_path, output_path):
     try:
         request = json.loads(Path(request_path).read_text(encoding="utf-8"))
         result = recognize(request)
     except Exception:
         result = {"events": [], "diagnostics": [traceback.format_exc()[-2000:]], "candidates": [], "used_templates": [], "status": "needs_review"}
-    Path(output_path).write_text(json.dumps(result, ensure_ascii=False), encoding="utf-8")
+    destination = Path(output_path)
+    staged = destination.with_suffix('.tmp')
+    staged.write_text(json.dumps(result, ensure_ascii=False), encoding='utf-8')
+    os.replace(staged, destination)
+
+
+if __name__ == '__main__':
+    if sys.argv[1:] == ['--serve']:
+        # Keep imports, OCR models and base icon crops warm; no original images
+        # survive a request. Retire periodically to bound third-party caches.
+        maximum = int(os.getenv('OCR_PROCESS_MAX_JOBS', '1000'))
+        for index, line in enumerate(sys.stdin):
+            run_request(*json.loads(line))
+            if index + 1 >= maximum:
+                break
+    else:
+        run_request(*sys.argv[1:3])

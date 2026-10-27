@@ -40,9 +40,13 @@ class Database:
         CREATE TABLE IF NOT EXISTS jobs(id INTEGER PRIMARY KEY,sha TEXT NOT NULL,task TEXT NOT NULL,source TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'pending',result TEXT,candidates TEXT,retry_at REAL NOT NULL DEFAULT 0,error TEXT NOT NULL DEFAULT '',UNIQUE(sha,task));
         CREATE TABLE IF NOT EXISTS commands(id INTEGER PRIMARY KEY,payload TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'pending',result TEXT,reported INTEGER NOT NULL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);
-        UPDATE jobs SET state='pending' WHERE state='processing';
         UPDATE commands SET state='pending' WHERE state='processing';
         """)
+        if 'active' not in {row[1] for row in self.db.execute('PRAGMA table_info(jobs)')}:
+            self.db.execute('ALTER TABLE jobs ADD COLUMN active INTEGER NOT NULL DEFAULT 0')
+        with self.db:
+            self.db.execute("UPDATE jobs SET active=0,state=CASE WHEN result IS NULL THEN 'pending' ELSE 'delivery' END WHERE state='processing' OR active=1")
+            self.db.execute('CREATE INDEX IF NOT EXISTS jobs_active_sha ON jobs(sha) WHERE active=1')
 
     def close(self):
         with self.lock:
@@ -64,9 +68,9 @@ class Database:
 
     def claim(self):
         with self.lock, self.db:
-            row = self.db.execute("SELECT * FROM jobs WHERE state IN ('pending','delivery') AND retry_at<=? ORDER BY CASE WHEN task LIKE 'command:%' THEN 0 ELSE 1 END,id LIMIT 1", (time.time(),)).fetchone()
-            if row and row["state"] == "pending":
-                self.db.execute("UPDATE jobs SET state='processing' WHERE id=?", (row["id"],))
+            row = self.db.execute("SELECT j.* FROM jobs j WHERE j.active=0 AND j.state IN ('pending','delivery') AND j.retry_at<=? AND NOT EXISTS(SELECT 1 FROM jobs busy WHERE busy.sha=j.sha AND busy.active=1) ORDER BY CASE WHEN task LIKE 'command:%' THEN 0 ELSE 1 END,id LIMIT 1", (time.time(),)).fetchone()
+            if row:
+                self.db.execute("UPDATE jobs SET active=1,state=CASE WHEN state='pending' THEN 'processing' ELSE state END WHERE id=?", (row['id'],))
             return dict(row) if row else None
 
     def save_result(self, job, result, candidates):
@@ -75,16 +79,16 @@ class Database:
 
     def finish(self, job):
         with self.lock, self.db:
-            self.db.execute("UPDATE jobs SET state='done',candidates=NULL,error='' WHERE id=?", (job["id"],))
+            self.db.execute("UPDATE jobs SET state='done',active=0,candidates=NULL,error='' WHERE id=?", (job["id"],))
 
     def retry(self, job, error):
         with self.lock, self.db:
             state = "delivery" if self.db.execute("SELECT result FROM jobs WHERE id=?", (job["id"],)).fetchone()[0] else "pending"
-            self.db.execute("UPDATE jobs SET state=?,retry_at=?,error=? WHERE id=?", (state, time.time() + 10, str(error)[:2000], job["id"]))
+            self.db.execute("UPDATE jobs SET state=?,active=0,retry_at=?,error=? WHERE id=?", (state, time.time() + 10, str(error)[:2000], job["id"]))
 
     def quarantine(self, job, message):
         with self.lock, self.db:
-            self.db.execute("UPDATE jobs SET state='failed',error=? WHERE id=?", (message, job["id"]))
+            self.db.execute("UPDATE jobs SET state='failed',active=0,error=? WHERE id=?", (message, job["id"]))
 
     def pending(self):
         with self.lock:

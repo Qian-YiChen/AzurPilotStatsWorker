@@ -24,12 +24,16 @@ def main():
         screen.save(screenshot)
         request = {"alas_root": str(root), "files": [str(screenshot)], "templates": [], "source": {"sha256": "a" * 64, "metadata": {"project": "drop", "scene": "campaign", "server": "cn"}}}
 
+        # All scenarios share a resident process, verifying that publishing and
+        # removing overlays does not leak prior templates into the next task.
+        sys.path.insert(0, str(adapter.parents[1]))
+        from worker.pool import RecognizerPool
+        pool = RecognizerPool(1)
         def parse():
             source, target = work / "request.json", work / "result.json"
             source.write_text(json.dumps(request), encoding="utf-8")
-            process = subprocess.run([sys.executable, str(adapter), str(source), str(target)], capture_output=True, timeout=180)
-            if process.returncode:
-                raise RuntimeError(process.stderr.decode(errors="replace"))
+            target.unlink(missing_ok=True)
+            pool.recognize(source,target,'cn',timeout=180)
             return json.loads(target.read_text(encoding="utf-8"))
 
         first = parse()
@@ -40,6 +44,12 @@ def main():
         assert second["status"] == "complete", second
         assert second["events"][0]["items"] == [{"item": "ImageSmokeBlueprint", "amount": 1, "tag": ""}], second
         assert second["used_templates"] == [candidate["id"]], second
+        assert len(pool.processes) == 1
+        request['templates'] = []
+        removed = parse()
+        assert removed['status'] == 'needs_review' and removed['candidates'], removed
+        assert removed['used_templates'] == [], removed
+        request['templates'] = [{"id": candidate["id"], "item_id": "ImageSmokeBlueprint", "scene": "all", "enabled": True, "image": candidate["image"]}]
 
         # Operation Siren uses its own grids and sums equal drops from distinct
         # frames. The generic reward-page overlap merger must not remove them.
@@ -78,6 +88,7 @@ def main():
         assert not any("Traceback" in d for d in refresh["diagnostics"]), refresh
         assert refresh["status"] == "needs_review", refresh
         assert "research_refresh:incomplete_project_list" in refresh["diagnostics"], refresh
+        pool.close()
     print("Offline OCR and template smoke test passed")
 
 
