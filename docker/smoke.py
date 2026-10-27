@@ -68,6 +68,16 @@ def main():
         assert research_focus(focused, [9, 9, 8, 8, 7]) == 0
         focused[652:690, 821:859] = (255, 255, 255)
         assert research_focus(focused, [9, 9, 9, 8, 7]) == 0
+
+        # Exercise the actual research-list path in the minimal image too. A
+        # generic reward-page smoke test misses accidental Android dependencies.
+        request["source"]["metadata"].update(project="research", scene="research_refresh")
+        request["files"] = [str(screenshot)]
+        request["templates"] = []
+        refresh = parse()
+        assert not any("Traceback" in d for d in refresh["diagnostics"]), refresh
+        assert refresh["status"] == "needs_review", refresh
+        assert "research_refresh:incomplete_project_list" in refresh["diagnostics"], refresh
     print("Offline OCR and template smoke test passed")
 
 

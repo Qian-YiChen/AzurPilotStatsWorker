@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 FROM --platform=$BUILDPLATFORM alpine:3 AS alas-source
-ARG ALAS_REVISION=d0ce990caf24b821e4250909ada78016f95d31d0
+ARG ALAS_REVISION=3a0a126504e92453631b6534254a60e8b00a544d
 # Fetch a pinned source archive, never repository history or local Git config.
 ADD https://codeload.github.com/wess09/AzurPilot/tar.gz/${ALAS_REVISION} /source.tar.gz
 RUN mkdir -p /source /alas/bin \
@@ -23,7 +23,7 @@ RUN uv sync --locked --no-dev --extra ocr --no-cache --python /usr/local/bin/pyt
 COPY worker/ ./worker/
 COPY docker/ ./docker/
 COPY --from=alas-source --chown=worker:worker /alas /opt/alas
-ARG ALAS_REVISION=d0ce990caf24b821e4250909ada78016f95d31d0
+ARG ALAS_REVISION=3a0a126504e92453631b6534254a60e8b00a544d
 LABEL io.azurpilot.alas.revision=$ALAS_REVISION
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 \

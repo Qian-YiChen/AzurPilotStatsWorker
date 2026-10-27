@@ -12,7 +12,7 @@ docker compose pull
 docker compose up -d
 ```
 
-镜像 `ghcr.io/wess09/azurpilotstatsworker:latest` 包含 Python、OCR 依赖、基础模板和模型。Dockerfile 固定使用公开客户端提交 `d0ce990caf24b821e4250909ada78016f95d31d0`，其源码与许可证位于镜像 `/opt/alas/`；构建不读取宿主机客户端目录或配置。每次镜像构建都在断网条件下验证真实 OCR、候选提取和模板补齐。
+镜像 `ghcr.io/wess09/azurpilotstatsworker:latest` 包含 Python、OCR 依赖、基础模板和模型。Dockerfile 固定使用公开客户端提交 `3a0a126504e92453631b6534254a60e8b00a544d`，其源码与许可证位于镜像 `/opt/alas/`；构建不读取宿主机客户端目录或配置。每次镜像构建都在断网条件下验证真实 OCR、候选提取、模板补齐和科研刷新入口；科研图像识别不依赖 Android 设备控制模块。
 
 Compose 自动设置容器内 `ALAS_ROOT / ALAS_PYTHON` 和监听地址，不需要挂载宿主机 Python 环境。任务和结构化结果保存在 `worker-state` 卷，删除容器不会丢失。`WORKER_IMAGE` 可指定版本；支持 `latest / main / sha-<完整提交号>`，`v*` 标签发布版本镜像。原生开发仍可使用：
 
@@ -41,6 +41,10 @@ SQLite 以 WAL/FULL 保存批次、待办、结果及进度，事务提交后才
 C 离线时保留结构化结果和小候选图，重传不重复 OCR。C 接收后清除本地候选图副本；SQLite 仍保留任务/结果历史，须备份并监控容量。123 盘是唯一长期原图存储。
 
 123 盘下载走官方 [download_info](https://123yunpan.yuque.com/org-wiki-123yunpan-muaork/cr6ced/fnf60phsushn8ip2)；逐块落盘并校验大小和 SHA-256。确认账户开放平台下载额度能覆盖实际流量，额度/鉴权失败保留待办，不丢任务。
+
+也可配置 `WEBDAV_URL`、`WEBDAV_USERNAME`、`WEBDAV_PASSWORD`，改用 WebDAV 下载，无需 B 的 OpenAPI 凭据。目录必须对应 A 的上传目录，例如 `https://webdav.123pan.cn/webdav`。B 直接请求 `<sha256>.png`，不扫描整个目录；继续逐块落盘、校验大小和 SHA-256，并在处理结束后清理本地原图。凭据单独保存在 `.env`，不放进 URL，跨域 CDN 重定向不携带 WebDAV 认证。
+
+日志分别记录 `Original downloaded`、`OCR completed` 和 `Result delivered`，包含图片组哈希及下载/识别耗时。队列采用单路识别执行器；半小时内的全部任务会先持久化接收，后台“完成”按图片组计数，不是按原图张数。
 
 ## 识别与模板
 

@@ -1,8 +1,9 @@
 import hashlib
 import time
 import threading
+import re
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 
 import httpx
 
@@ -96,3 +97,52 @@ class Pan:
         if urlparse(url).scheme != "https":
             raise ValueError("123Pan returned a non-HTTPS download URL")
         return url
+
+
+class WebDAV:
+    """A stores immutable originals as <sha256>.png in this WebDAV directory."""
+
+    def __init__(self, config):
+        self.config = config
+        self.base_url = config.webdav_url.rstrip("/") + "/"
+        self.origin = httpx.URL(self.base_url)
+        self.auth = httpx.BasicAuth(config.webdav_username, config.webdav_password)
+        self.client = httpx.Client(timeout=httpx.Timeout(120, connect=10), follow_redirects=False)
+
+    def download(self, file, path: Path):
+        if not re.fullmatch(r"[0-9a-f]{64}", file["sha256"]):
+            raise ValueError("Invalid original hash")
+        url = self.base_url + file["sha256"] + ".png"
+        digest = hashlib.sha256()
+        size = 0
+        try:
+            for _ in range(6):
+                target = httpx.URL(url)
+                if target.scheme != "https" or target.userinfo:
+                    raise ValueError("WebDAV redirect must use HTTPS without URL credentials")
+                same_origin = (target.scheme, target.host, target.port) == (self.origin.scheme, self.origin.host, self.origin.port)
+                with self.client.stream("GET", target, auth=self.auth if same_origin else None) as response:
+                    if response.is_redirect:
+                        location = response.headers.get("Location")
+                        if not location:
+                            raise ValueError("WebDAV redirect has no location")
+                        url = urljoin(str(target), location)
+                        continue
+                    if response.status_code != 200:
+                        # Signed CDN query strings and account credentials must
+                        # never become part of a persisted job error/traceback.
+                        raise RuntimeError(f"WebDAV download HTTP {response.status_code}")
+                    with path.open("wb") as dst:
+                        for block in response.iter_bytes(65536):
+                            size += len(block)
+                            if size > file["size"] or size > self.config.file_bytes:
+                                raise ValueError("Downloaded file exceeds expected size")
+                            digest.update(block)
+                            dst.write(block)
+                    if size != file["size"] or digest.hexdigest() != file["sha256"]:
+                        raise ValueError("Downloaded file hash/size mismatch")
+                    return
+            raise ValueError("Too many WebDAV redirects")
+        except BaseException:
+            path.unlink(missing_ok=True)
+            raise

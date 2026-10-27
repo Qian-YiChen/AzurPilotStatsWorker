@@ -8,8 +8,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
-from .clients import Pan, Statistics
+from .clients import Pan, Statistics, WebDAV
 
 log = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ class Engine:
         self.config = config
         self.db = db
         self.stats = Statistics(config)
-        self.pan = Pan(config)
+        self.pan = WebDAV(config) if config.webdav_url else Pan(config)
         self.work = config.data / "work"
         self.work.mkdir(exist_ok=True)
         # A worker is deliberately single-process. No other process may share
@@ -39,17 +40,25 @@ class Engine:
                 if shutil.disk_usage(self.work).free < file["size"] + 128 * 1024**2:
                     raise RuntimeError("Insufficient B working disk space")
                 path = directory / f"{file['index']}.png"
+                started = time.monotonic()
                 self.pan.download(file, path)
+                log.info("Original downloaded sha=%s index=%s bytes=%s seconds=%.3f transport=%s",
+                         source["sha256"], file["index"], file["size"], time.monotonic() - started,
+                         "webdav" if self.config.webdav_url else "openapi")
                 paths.append(str(path))
             request = {"source": source, "files": paths, "alas_root": str(self.config.alas_root), "templates": self.db.setting("templates", []) if templates is None else templates}
             input_path = directory / "input.json"
             output_path = directory / "output.json"
             input_path.write_text(json.dumps(request), encoding="utf-8")
             python = os.getenv("ALAS_PYTHON", sys.executable)
+            started = time.monotonic()
             subprocess.run([python, str(Path(__file__).with_name("recognize.py")), str(input_path), str(output_path)], check=True, timeout=int(os.getenv("RECOGNITION_TIMEOUT", "600")), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             if output_path.stat().st_size > 8 * 1024**2:
                 raise ValueError("Recognition output is too large")
-            return json.loads(output_path.read_text(encoding="utf-8"))
+            parsed = json.loads(output_path.read_text(encoding="utf-8"))
+            log.info("OCR completed sha=%s status=%s seconds=%.3f diagnostics=%s", source["sha256"],
+                     parsed["status"], time.monotonic() - started, len(parsed["diagnostics"]))
+            return parsed
 
     def process(self, job):
         try:
@@ -73,6 +82,8 @@ class Engine:
             ack = self.stats.post("/internal/v1/statistics/results", {"results": [result]})["receipts"][0]
             if ack["status"] in ("accepted", "duplicate"):
                 self.db.finish(job)
+                log.info("Result delivered sha=%s revision=%s status=%s", source["sha256"],
+                         result["revision"], result["status"])
                 active = self.db.setting("release_id", 0)
                 if active != result["template_release"]:
                     # Publication may race an in-flight first result, before C
@@ -82,6 +93,7 @@ class Engine:
                 raise RuntimeError(ack.get("error", "C temporarily unavailable"))
             else:
                 self.db.quarantine(job, json.dumps(ack, ensure_ascii=False))
+                log.error("Result rejected sha=%s receipt=%s error=%s", source["sha256"], ack["status"], ack.get("error", ""))
         except Exception as exc:
             log.exception("Recognition/delivery will retry")
             self.db.retry(job, exc)
