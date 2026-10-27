@@ -64,7 +64,7 @@ class Database:
 
     def claim(self):
         with self.lock, self.db:
-            row = self.db.execute("SELECT * FROM jobs WHERE state IN ('pending','delivery') AND retry_at<=? ORDER BY id LIMIT 1", (time.time(),)).fetchone()
+            row = self.db.execute("SELECT * FROM jobs WHERE state IN ('pending','delivery') AND retry_at<=? ORDER BY CASE WHEN task LIKE 'command:%' THEN 0 ELSE 1 END,id LIMIT 1", (time.time(),)).fetchone()
             if row and row["state"] == "pending":
                 self.db.execute("UPDATE jobs SET state='processing' WHERE id=?", (row["id"],))
             return dict(row) if row else None
@@ -89,6 +89,26 @@ class Database:
     def pending(self):
         with self.lock:
             return self.db.execute("SELECT count(*) FROM jobs WHERE state NOT IN ('done','failed')").fetchone()[0]
+
+    def is_redundant_research_list(self, source):
+        """Only discard mislabeled completion frames already submitted as lists."""
+        meta = source["metadata"]
+        if meta.get("project") != "research" or meta.get("scene") != "research_complete":
+            return False
+        wanted = {file["sha256"] for file in source["files"]}
+        covered = set()
+        with self.lock:
+            rows = self.db.execute("SELECT source FROM jobs WHERE task='ingest' AND sha<>?", (source["sha256"],))
+            for row in rows:
+                other = json.loads(row[0])
+                other_meta = other["metadata"]
+                if (other_meta.get("project") == "research" and other_meta.get("scene") == "research_refresh"
+                        and other_meta.get("device_id") == meta.get("device_id")
+                        and other_meta.get("instance_id") == meta.get("instance_id")):
+                    covered.update(file["sha256"] for file in other["files"])
+                    if wanted <= covered:
+                        return True
+        return False
 
     def setting(self, key, default=None):
         with self.lock:

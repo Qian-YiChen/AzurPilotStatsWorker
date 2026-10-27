@@ -67,6 +67,10 @@ class Engine:
                 revision = self.stats.revision(source["sha256"]) + 1
                 release_id, templates = self.db.release()
                 parsed = self.recognize(source, templates)
+                if ({"no_complete_reward_frame", "unknown_research_project_or_series"}
+                        <= set(parsed["diagnostics"]) and self.db.is_redundant_research_list(source)):
+                    parsed = {"status": "invalid", "events": [], "diagnostics": ["duplicate_research_list_capture"],
+                              "candidates": [], "used_templates": []}
                 overrides = parsed.get("metadata_overrides", {})
                 if set(overrides) - {"project", "scene"} or any(not isinstance(v, str) or len(v) > 128 for v in overrides.values()):
                     raise ValueError("Invalid inferred metadata")
