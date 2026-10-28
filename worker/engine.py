@@ -97,6 +97,9 @@ class Engine:
                 revision = self.stats.revision(source["sha256"]) + 1
                 release_id, templates = self.db.release()
                 parsed = self.recognize(source, templates)
+                if parsed.get("skipped_frames"):
+                    log.warning("Commission frames skipped sha=%s details=%s", source["sha256"],
+                                json.dumps(parsed["skipped_frames"], ensure_ascii=False))
                 if ({"no_complete_reward_frame", "unknown_research_project_or_series"}
                         <= set(parsed["diagnostics"]) and self.db.is_redundant_research_list(source)):
                     parsed = {"status": "invalid", "events": [], "diagnostics": ["duplicate_research_list_capture"],
@@ -105,7 +108,7 @@ class Engine:
                 if set(overrides) - {"project", "scene"} or any(not isinstance(v, str) or len(v) > 128 for v in overrides.values()):
                     raise ValueError("Invalid inferred metadata")
                 source["metadata"].update(overrides)
-                result = {"sha256": source["sha256"], "revision": revision, "status": parsed["status"], "parser_version": "azurpilot-adapter-v2", "template_release": release_id, "source": source, "events": parsed["events"], "diagnostics": parsed["diagnostics"], "candidate_ids": sorted({c["id"] for c in parsed["candidates"]}), "used_templates": parsed["used_templates"]}
+                result = {"sha256": source["sha256"], "revision": revision, "status": parsed["status"], "parser_version": "azurpilot-adapter-v3", "template_release": release_id, "source": source, "events": parsed["events"], "diagnostics": parsed["diagnostics"], "candidate_ids": sorted({c["id"] for c in parsed["candidates"]}), "used_templates": parsed["used_templates"]}
                 self.db.save_result(job, result, parsed["candidates"])
                 candidates = parsed["candidates"]
             else:

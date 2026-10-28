@@ -1,0 +1,1729 @@
+{
+  "schema_version": 1,
+  "sources": {
+    "cn": "collection_template.json local snapshot, 173 entries; names only, no inferred IDs or durations",
+    "cn_sha256": "2599689d74a96dd608a45ec6b62c86a35c53b05689eb923de8e3bf99e275ca82",
+    "translations": "https://raw.githubusercontent.com/LmeSzinc/azur-stats-server/3a743f091b0a98d42a8dc04c3d16be9552a9c7d6/AzurStats/commission/data.py"
+  },
+  "entries": [
+    {
+      "name": "BIW巡视护卫",
+      "aliases": {
+        "cn": [
+          "BIW巡视护卫"
+        ],
+        "en": [
+          "BIWPATROLESCORT"
+        ],
+        "jp": [
+          "BIW要人護衛"
+        ],
+        "tw": [
+          "BIW巡視護衛"
+        ]
+      }
+    },
+    {
+      "name": "BIW度假护卫",
+      "aliases": {
+        "cn": [
+          "BIW度假护卫"
+        ],
+        "en": [
+          "BIWHOLIDAYESCORT"
+        ],
+        "jp": [
+          "BIW休暇護衛"
+        ],
+        "tw": [
+          "BIW度假護衛"
+        ]
+      }
+    },
+    {
+      "name": "BIW物资交接",
+      "aliases": {
+        "cn": [
+          "BIW物资交接"
+        ],
+        "en": [
+          "BIWHANDOVER"
+        ],
+        "jp": [
+          "BIW物資交換"
+        ],
+        "tw": [
+          "BIW物資交接"
+        ]
+      }
+    },
+    {
+      "name": "BIW装备研发",
+      "aliases": {
+        "cn": [
+          "BIW装备研发"
+        ],
+        "en": [
+          "BIWGEARRESEARCH"
+        ],
+        "jp": [
+          "BIW装備試験"
+        ],
+        "tw": [
+          "BIW裝備研發"
+        ]
+      }
+    },
+    {
+      "name": "BIW装备运输",
+      "aliases": {
+        "cn": [
+          "BIW装备运输"
+        ],
+        "en": [
+          "BIWGEARTRANSPORT"
+        ],
+        "jp": [
+          "BIW装備輸送"
+        ],
+        "tw": [
+          "BIW裝備運輸"
+        ]
+      }
+    },
+    {
+      "name": "BIW要员护卫",
+      "aliases": {
+        "cn": [
+          "BIW要员护卫"
+        ],
+        "en": [
+          "BIWVIPESCORT"
+        ],
+        "jp": [
+          "BIW要人護衛"
+        ],
+        "tw": [
+          "BIW要員護衛"
+        ]
+      }
+    },
+    {
+      "name": "NYB巡视护卫",
+      "aliases": {
+        "cn": [
+          "NYB巡视护卫"
+        ],
+        "en": [
+          "NYBPATROLESCORT"
+        ],
+        "jp": [
+          "NYB要人護衛"
+        ],
+        "tw": [
+          "NYB巡視護衛"
+        ]
+      }
+    },
+    {
+      "name": "NYB度假护卫",
+      "aliases": {
+        "cn": [
+          "NYB度假护卫"
+        ],
+        "en": [
+          "NYBHOLIDAYESCORT"
+        ],
+        "jp": [
+          "NYB休暇護衛"
+        ],
+        "tw": [
+          "NYB度假護衛"
+        ]
+      }
+    },
+    {
+      "name": "NYB物资交接",
+      "aliases": {
+        "cn": [
+          "NYB物资交接"
+        ],
+        "en": [
+          "NYBHANDOVER"
+        ],
+        "jp": [
+          "NYB物資交換"
+        ],
+        "tw": [
+          "NYB物資交接"
+        ]
+      }
+    },
+    {
+      "name": "NYB装备研发",
+      "aliases": {
+        "cn": [
+          "NYB装备研发"
+        ],
+        "en": [
+          "NYBGEARRESEARCH"
+        ],
+        "jp": [
+          "NYB装備試験"
+        ],
+        "tw": [
+          "NYB裝備研發"
+        ]
+      }
+    },
+    {
+      "name": "NYB装备运输",
+      "aliases": {
+        "cn": [
+          "NYB装备运输"
+        ],
+        "en": [
+          "NYBGEARTRANSPORT"
+        ],
+        "jp": [
+          "NYB装備輸送"
+        ],
+        "tw": [
+          "NYB裝備運輸"
+        ]
+      }
+    },
+    {
+      "name": "NYB要员护卫",
+      "aliases": {
+        "cn": [
+          "NYB要员护卫"
+        ],
+        "en": [
+          "NYBVIPESCORT"
+        ],
+        "jp": [
+          "NYB要人護衛"
+        ],
+        "tw": [
+          "NYB要員護衛"
+        ]
+      }
+    },
+    {
+      "name": "piqiu~piqiu~搓碟",
+      "aliases": {
+        "cn": [
+          "piqiu~piqiu~搓碟"
+        ]
+      }
+    },
+    {
+      "name": "中型商船护卫",
+      "aliases": {
+        "cn": [
+          "中型商船护卫"
+        ],
+        "en": [
+          "MEDIUMMERCHANTESCORT"
+        ],
+        "jp": [
+          "中型船団護衛"
+        ],
+        "tw": [
+          "中型商船護衛"
+        ]
+      }
+    },
+    {
+      "name": "中型油田开发I",
+      "aliases": {
+        "cn": [
+          "中型油田开发I",
+          "中型油田开发Ⅰ"
+        ],
+        "en": [
+          "MIDSCALEOILEXTRACTIONⅠ"
+        ],
+        "jp": [
+          "中型油田開発Ⅰ"
+        ],
+        "tw": [
+          "中型油田開發Ⅰ"
+        ]
+      }
+    },
+    {
+      "name": "中型油田开发II",
+      "aliases": {
+        "cn": [
+          "中型油田开发II",
+          "中型油田开发Ⅱ"
+        ],
+        "en": [
+          "MIDSCALEOILEXTRACTIONⅡ"
+        ],
+        "jp": [
+          "中型油田開発Ⅱ"
+        ],
+        "tw": [
+          "中型油田開發Ⅱ"
+        ]
+      }
+    },
+    {
+      "name": "中型油田开发III",
+      "aliases": {
+        "cn": [
+          "中型油田开发III",
+          "中型油田开发Ⅲ"
+        ],
+        "en": [
+          "MIDSCALEOILEXTRACTIONⅢ"
+        ],
+        "jp": [
+          "中型油田開発Ⅲ"
+        ],
+        "tw": [
+          "中型油田開發Ⅲ"
+        ]
+      }
+    },
+    {
+      "name": "中级林木护卫委托",
+      "aliases": {
+        "cn": [
+          "中级林木护卫委托"
+        ],
+        "en": [
+          "FORESTPROTECTIONCOMMISSIONⅡ"
+        ],
+        "jp": [
+          "中級木材輸送護衛"
+        ],
+        "tw": [
+          "中級林木護衛委託"
+        ]
+      }
+    },
+    {
+      "name": "中级矿脉护卫委托",
+      "aliases": {
+        "cn": [
+          "中级矿脉护卫委托"
+        ],
+        "en": [
+          "VEINPROTECTIONCOMMISSIONⅡ"
+        ],
+        "jp": [
+          "中級鉄鋼輸送護衛"
+        ],
+        "tw": [
+          "中級礦脈護衛委託"
+        ]
+      }
+    },
+    {
+      "name": "中距离航行训练",
+      "aliases": {
+        "cn": [
+          "中距离航行训练"
+        ],
+        "en": [
+          "MIDRANGESAILINGTRAINING"
+        ],
+        "jp": [
+          "中距離練習航海"
+        ],
+        "tw": [
+          "中距離航行訓練"
+        ]
+      }
+    },
+    {
+      "name": "中阶对抗演习",
+      "aliases": {
+        "cn": [
+          "中阶对抗演习"
+        ],
+        "en": [
+          "DEFENSEEXERCISEⅡ"
+        ],
+        "jp": [
+          "中級対抗演習"
+        ],
+        "tw": [
+          "中階對抗演習"
+        ]
+      }
+    },
+    {
+      "name": "中阶工具整备",
+      "aliases": {
+        "cn": [
+          "中阶工具整备"
+        ],
+        "en": [
+          "TOOLPREPⅡ"
+        ],
+        "jp": [
+          "中級資材整理"
+        ],
+        "tw": [
+          "中階工具整備"
+        ]
+      }
+    },
+    {
+      "name": "中阶战术课程",
+      "aliases": {
+        "cn": [
+          "中阶战术课程"
+        ],
+        "en": [
+          "TACTICALCLASSⅡ"
+        ],
+        "jp": [
+          "中級戦術課程"
+        ],
+        "tw": [
+          "中階戰術課程"
+        ]
+      }
+    },
+    {
+      "name": "中阶科研任务",
+      "aliases": {
+        "cn": [
+          "中阶科研任务"
+        ],
+        "en": [
+          "RESEARCHMISSIONⅡ"
+        ],
+        "jp": [
+          "中級科学研究"
+        ],
+        "tw": [
+          "中階科研任務"
+        ]
+      }
+    },
+    {
+      "name": "中阶自主训练",
+      "aliases": {
+        "cn": [
+          "中阶自主训练"
+        ],
+        "en": [
+          "SELFTRAININGⅡ"
+        ],
+        "jp": [
+          "中級自主訓練"
+        ],
+        "tw": [
+          "中階自主訓練"
+        ]
+      }
+    },
+    {
+      "name": "中阶货物运输",
+      "aliases": {
+        "cn": [
+          "中阶货物运输"
+        ],
+        "en": [
+          "CARGOTRANSPORTⅡ"
+        ],
+        "jp": [
+          "中級貨物輸送"
+        ],
+        "tw": [
+          "中階貨物運輸"
+        ]
+      }
+    },
+    {
+      "name": "保卫运输部队Ⅰ",
+      "aliases": {
+        "cn": [
+          "保卫运输部队Ⅰ"
+        ],
+        "en": [
+          "CARGODEFENSEⅠ"
+        ],
+        "jp": [
+          "輸送部隊護衛Ⅰ"
+        ],
+        "tw": [
+          "保衛運輸部隊Ⅰ"
+        ]
+      }
+    },
+    {
+      "name": "保卫运输部队Ⅱ",
+      "aliases": {
+        "cn": [
+          "保卫运输部队Ⅱ"
+        ],
+        "en": [
+          "CARGODEFENSEⅡ"
+        ],
+        "jp": [
+          "輸送部隊護衛Ⅱ"
+        ],
+        "tw": [
+          "保衛運輸部隊Ⅱ"
+        ]
+      }
+    },
+    {
+      "name": "保卫运输部队Ⅲ",
+      "aliases": {
+        "cn": [
+          "保卫运输部队Ⅲ"
+        ],
+        "en": [
+          "CARGODEFENSEⅢ"
+        ],
+        "jp": [
+          "輸送部隊護衛Ⅲ"
+        ],
+        "tw": [
+          "保衛運輸部隊Ⅲ"
+        ]
+      }
+    },
+    {
+      "name": "初级林木护卫委托",
+      "aliases": {
+        "cn": [
+          "初级林木护卫委托"
+        ],
+        "en": [
+          "FORESTPROTECTIONCOMMISSIONⅠ"
+        ],
+        "jp": [
+          "初級木材輸送護衛"
+        ],
+        "tw": [
+          "初級林木護衛委託"
+        ]
+      }
+    },
+    {
+      "name": "初级矿脉护卫委托",
+      "aliases": {
+        "cn": [
+          "初级矿脉护卫委托"
+        ],
+        "en": [
+          "VEINPROTECTIONCOMMISSIONⅠ"
+        ],
+        "jp": [
+          "初級鉄鋼輸送護衛"
+        ],
+        "tw": [
+          "初級礦脈護衛委託"
+        ]
+      }
+    },
+    {
+      "name": "初阶对抗演习",
+      "aliases": {
+        "cn": [
+          "初阶对抗演习"
+        ],
+        "en": [
+          "DEFENSEEXERCISEⅠ"
+        ],
+        "jp": [
+          "初級対抗演習"
+        ],
+        "tw": [
+          "初階對抗演習"
+        ]
+      }
+    },
+    {
+      "name": "初阶工具整备",
+      "aliases": {
+        "cn": [
+          "初阶工具整备"
+        ],
+        "en": [
+          "TOOLPREPⅠ"
+        ],
+        "jp": [
+          "初級資材整理"
+        ],
+        "tw": [
+          "初階工具整備"
+        ]
+      }
+    },
+    {
+      "name": "初阶战术课程",
+      "aliases": {
+        "cn": [
+          "初阶战术课程"
+        ],
+        "en": [
+          "TACTICALCLASSⅠ"
+        ],
+        "jp": [
+          "初級戦術課程"
+        ],
+        "tw": [
+          "初階戰術課程"
+        ]
+      }
+    },
+    {
+      "name": "初阶科研任务",
+      "aliases": {
+        "cn": [
+          "初阶科研任务"
+        ],
+        "en": [
+          "RESEARCHMISSIONⅠ"
+        ],
+        "jp": [
+          "初級科学研究"
+        ],
+        "tw": [
+          "初階科研任務"
+        ]
+      }
+    },
+    {
+      "name": "初阶自主训练",
+      "aliases": {
+        "cn": [
+          "初阶自主训练"
+        ],
+        "en": [
+          "SELFTRAININGⅠ"
+        ],
+        "jp": [
+          "初級自主訓練"
+        ],
+        "tw": [
+          "初階自主訓練"
+        ]
+      }
+    },
+    {
+      "name": "初阶货物运输",
+      "aliases": {
+        "cn": [
+          "初阶货物运输"
+        ],
+        "en": [
+          "CARGOTRANSPORTⅠ"
+        ],
+        "jp": [
+          "初級貨物輸送"
+        ],
+        "tw": [
+          "初階貨物運輸"
+        ]
+      }
+    },
+    {
+      "name": "前沿基地防卫巡逻",
+      "aliases": {
+        "cn": [
+          "前沿基地防卫巡逻"
+        ],
+        "en": [
+          "FRONTIERDEFENSEPATROL"
+        ],
+        "jp": [
+          "前線基地防衛巡回"
+        ],
+        "tw": [
+          "前線基地防衛巡邏"
+        ]
+      }
+    },
+    {
+      "name": "同盟观舰仪式",
+      "aliases": {
+        "cn": [
+          "同盟观舰仪式"
+        ],
+        "en": [
+          "ALLIANCELAUNCHCEREMONY"
+        ],
+        "jp": [
+          "多国連合観艦式"
+        ],
+        "tw": [
+          "同盟觀艦儀式"
+        ]
+      }
+    },
+    {
+      "name": "大型商船护卫",
+      "aliases": {
+        "cn": [
+          "大型商船护卫"
+        ],
+        "en": [
+          "LARGEMERCHANTESCORT"
+        ],
+        "jp": [
+          "大型船団護衛"
+        ],
+        "tw": [
+          "大型商船護衛"
+        ]
+      }
+    },
+    {
+      "name": "大型油田开发I",
+      "aliases": {
+        "cn": [
+          "大型油田开发I",
+          "大型油田开发Ⅰ"
+        ],
+        "en": [
+          "LARGESCALEOILEXTRACTIONⅠ"
+        ],
+        "jp": [
+          "大型油田開発Ⅰ"
+        ],
+        "tw": [
+          "大型油田開發Ⅰ"
+        ]
+      }
+    },
+    {
+      "name": "大型油田开发II",
+      "aliases": {
+        "cn": [
+          "大型油田开发II",
+          "大型油田开发Ⅱ"
+        ],
+        "en": [
+          "LARGESCALEOILEXTRACTIONⅡ"
+        ],
+        "jp": [
+          "大型油田開発Ⅱ"
+        ],
+        "tw": [
+          "大型油田開發Ⅱ"
+        ]
+      }
+    },
+    {
+      "name": "大型油田开发III",
+      "aliases": {
+        "cn": [
+          "大型油田开发III",
+          "大型油田开发Ⅲ"
+        ],
+        "en": [
+          "LARGESCALEOILEXTRACTIONⅢ"
+        ],
+        "jp": [
+          "大型油田開発Ⅲ"
+        ],
+        "tw": [
+          "大型油田開發Ⅲ"
+        ]
+      }
+    },
+    {
+      "name": "小型商船护卫",
+      "aliases": {
+        "cn": [
+          "小型商船护卫"
+        ],
+        "en": [
+          "SMALLMERCHANTESCORT"
+        ],
+        "jp": [
+          "小型船団護衛"
+        ],
+        "tw": [
+          "小型商船護衛"
+        ]
+      }
+    },
+    {
+      "name": "小型油田开发I",
+      "aliases": {
+        "cn": [
+          "小型油田开发I",
+          "小型油田开发Ⅰ"
+        ],
+        "en": [
+          "SMALLSCALEOILEXTRACTIONⅠ"
+        ],
+        "jp": [
+          "小型油田開発Ⅰ"
+        ],
+        "tw": [
+          "小型油田開發Ⅰ"
+        ]
+      }
+    },
+    {
+      "name": "小型油田开发II",
+      "aliases": {
+        "cn": [
+          "小型油田开发II",
+          "小型油田开发Ⅱ"
+        ],
+        "en": [
+          "SMALLSCALEOILEXTRACTIONⅡ"
+        ],
+        "jp": [
+          "小型油田開発Ⅱ"
+        ],
+        "tw": [
+          "小型油田開發Ⅱ"
+        ]
+      }
+    },
+    {
+      "name": "小型油田开发III",
+      "aliases": {
+        "cn": [
+          "小型油田开发III",
+          "小型油田开发Ⅲ"
+        ],
+        "en": [
+          "SMALLSCALEOILEXTRACTIONⅢ"
+        ],
+        "jp": [
+          "小型油田開発Ⅲ"
+        ],
+        "tw": [
+          "小型油田開發Ⅲ"
+        ]
+      }
+    },
+    {
+      "name": "小型观舰仪式",
+      "aliases": {
+        "cn": [
+          "小型观舰仪式"
+        ],
+        "en": [
+          "SMALLLAUNCHCEREMONY"
+        ],
+        "jp": [
+          "小型観艦式"
+        ],
+        "tw": [
+          "小型觀艦儀式"
+        ]
+      }
+    },
+    {
+      "name": "岛屿巡逻",
+      "aliases": {
+        "cn": [
+          "岛屿巡逻"
+        ]
+      }
+    },
+    {
+      "name": "布置广场灯光",
+      "aliases": {
+        "cn": [
+          "布置广场灯光"
+        ]
+      }
+    },
+    {
+      "name": "撰写报告",
+      "aliases": {
+        "cn": [
+          "撰写报告"
+        ]
+      }
+    },
+    {
+      "name": "擦亮小金人",
+      "aliases": {
+        "cn": [
+          "擦亮小金人"
+        ]
+      }
+    },
+    {
+      "name": "支援“伊”岛",
+      "aliases": {
+        "cn": [
+          "支援“伊”岛"
+        ]
+      }
+    },
+    {
+      "name": "支援卡波罗岛",
+      "aliases": {
+        "cn": [
+          "支援卡波罗岛"
+        ],
+        "en": [
+          "AIDINGKAPOLO"
+        ],
+        "jp": [
+          "外敵動静哨戒"
+        ],
+        "tw": [
+          "支援卡波羅島"
+        ]
+      }
+    },
+    {
+      "name": "支援土豪尔岛",
+      "aliases": {
+        "cn": [
+          "支援土豪尔岛"
+        ],
+        "en": [
+          "AIDINGTYRANTSISLAND"
+        ],
+        "jp": [
+          "離島物資輸送"
+        ],
+        "tw": [
+          "支援土豪爾島"
+        ]
+      }
+    },
+    {
+      "name": "支援多伦瓦岛",
+      "aliases": {
+        "cn": [
+          "支援多伦瓦岛"
+        ],
+        "en": [
+          "AIDINGRENDOVAISLAND"
+        ],
+        "jp": [
+          "離島火力支援"
+        ],
+        "tw": [
+          "支援多倫瓦島"
+        ]
+      }
+    },
+    {
+      "name": "支援姆波罗岛",
+      "aliases": {
+        "cn": [
+          "支援姆波罗岛"
+        ],
+        "en": [
+          "AIDINGPORO"
+        ],
+        "jp": [
+          "近海パトロール"
+        ],
+        "tw": [
+          "支援姆波羅島"
+        ]
+      }
+    },
+    {
+      "name": "支援恐班纳",
+      "aliases": {
+        "cn": [
+          "支援恐班纳"
+        ],
+        "en": [
+          "AIDINGKONGBANNA"
+        ],
+        "jp": [
+          "離島兵員輸送"
+        ],
+        "tw": [
+          "支援恐班納"
+        ]
+      }
+    },
+    {
+      "name": "支援特林岛",
+      "aliases": {
+        "cn": [
+          "支援特林岛"
+        ],
+        "en": [
+          "AIDINGKOTLINISLAND"
+        ],
+        "jp": [
+          "外敵中枢偵察"
+        ],
+        "tw": [
+          "支援特林島"
+        ]
+      }
+    },
+    {
+      "name": "支援玛丽岛",
+      "aliases": {
+        "cn": [
+          "支援玛丽岛"
+        ],
+        "en": [
+          "AIDINGSTMARYSISLAND"
+        ],
+        "jp": [
+          "前線部隊支援"
+        ],
+        "tw": [
+          "支援瑪麗島"
+        ]
+      }
+    },
+    {
+      "name": "支援维拉维拉岛",
+      "aliases": {
+        "cn": [
+          "支援维拉维拉岛"
+        ],
+        "en": [
+          "AIDINGVELLALAVELLA"
+        ],
+        "jp": [
+          "近海掃海任務"
+        ],
+        "tw": [
+          "支援維拉維拉島"
+        ]
+      }
+    },
+    {
+      "name": "支援萌岛",
+      "aliases": {
+        "cn": [
+          "支援萌岛"
+        ],
+        "en": [
+          "AIDINGISLEOFMAN"
+        ],
+        "jp": [
+          "兵站航路確保"
+        ],
+        "tw": [
+          "支援萌島"
+        ]
+      }
+    },
+    {
+      "name": "支援马内岛",
+      "aliases": {
+        "cn": [
+          "支援马内岛"
+        ],
+        "en": [
+          "AIDINGMANNEISLAND"
+        ],
+        "jp": [
+          "外敵生態調査"
+        ],
+        "tw": [
+          "支援馬內島"
+        ]
+      }
+    },
+    {
+      "name": "支援马拉基岛",
+      "aliases": {
+        "cn": [
+          "支援马拉基岛"
+        ],
+        "en": [
+          "AIDINGMAKIRA"
+        ],
+        "jp": [
+          "離島漸減支援"
+        ],
+        "tw": [
+          "支援馬拉基島"
+        ]
+      }
+    },
+    {
+      "name": "敌袭Ⅰ",
+      "aliases": {
+        "cn": [
+          "敌袭Ⅰ"
+        ],
+        "en": [
+          "ENEMYATTACKⅠ"
+        ],
+        "jp": [
+          "敵襲Ⅰ"
+        ],
+        "tw": [
+          "敵襲Ⅰ"
+        ]
+      }
+    },
+    {
+      "name": "敌袭Ⅱ",
+      "aliases": {
+        "cn": [
+          "敌袭Ⅱ"
+        ],
+        "en": [
+          "ENEMYATTACKⅡ"
+        ],
+        "jp": [
+          "敵襲Ⅱ"
+        ],
+        "tw": [
+          "敵襲Ⅱ"
+        ]
+      }
+    },
+    {
+      "name": "敌袭Ⅲ",
+      "aliases": {
+        "cn": [
+          "敌袭Ⅲ"
+        ],
+        "en": [
+          "ENEMYATTACKⅢ"
+        ],
+        "jp": [
+          "敵襲Ⅲ"
+        ],
+        "tw": [
+          "敵襲Ⅲ"
+        ]
+      }
+    },
+    {
+      "name": "料理制作",
+      "aliases": {
+        "cn": [
+          "料理制作"
+        ]
+      }
+    },
+    {
+      "name": "日常资源开发I",
+      "aliases": {
+        "cn": [
+          "日常资源开发I",
+          "日常资源开发Ⅰ"
+        ],
+        "en": [
+          "DAILYRESOURCEEXTRACTIONⅠ"
+        ],
+        "jp": [
+          "日常資源開発Ⅰ"
+        ],
+        "tw": [
+          "日常資源開發Ⅰ"
+        ]
+      }
+    },
+    {
+      "name": "日常资源开发II",
+      "aliases": {
+        "cn": [
+          "日常资源开发II",
+          "日常资源开发Ⅱ"
+        ],
+        "en": [
+          "DAILYRESOURCEEXTRACTIONⅡ"
+        ],
+        "jp": [
+          "日常資源開発Ⅱ"
+        ],
+        "tw": [
+          "日常資源開發Ⅱ"
+        ]
+      }
+    },
+    {
+      "name": "日常资源开发III",
+      "aliases": {
+        "cn": [
+          "日常资源开发III",
+          "日常资源开发Ⅲ"
+        ],
+        "en": [
+          "DAILYRESOURCEEXTRACTIONⅢ"
+        ],
+        "jp": [
+          "日常資源開発Ⅲ"
+        ],
+        "tw": [
+          "日常資源開發Ⅲ"
+        ]
+      }
+    },
+    {
+      "name": "日常资源开发IV",
+      "aliases": {
+        "cn": [
+          "日常资源开发IV",
+          "日常资源开发Ⅳ"
+        ],
+        "en": [
+          "DAILYRESOURCEEXTRACTIONⅣ"
+        ],
+        "jp": [
+          "日常資源開発Ⅳ"
+        ],
+        "tw": [
+          "日常資源開發Ⅳ"
+        ]
+      }
+    },
+    {
+      "name": "日常资源开发V",
+      "aliases": {
+        "cn": [
+          "日常资源开发V",
+          "日常资源开发Ⅴ"
+        ],
+        "en": [
+          "DAILYRESOURCEEXTRACTIONⅤ"
+        ],
+        "jp": [
+          "日常資源開発Ⅴ"
+        ],
+        "tw": [
+          "日常資源開發Ⅴ"
+        ]
+      }
+    },
+    {
+      "name": "日常资源开发VI",
+      "aliases": {
+        "cn": [
+          "日常资源开发VI",
+          "日常资源开发Ⅵ"
+        ],
+        "en": [
+          "DAILYRESOURCEEXTRACTIONⅥ"
+        ],
+        "jp": [
+          "日常資源開発Ⅵ"
+        ],
+        "tw": [
+          "日常資源開發Ⅵ"
+        ]
+      }
+    },
+    {
+      "name": "歼灭敌主力部队",
+      "aliases": {
+        "cn": [
+          "歼灭敌主力部队"
+        ],
+        "en": [
+          "DESTROYENEMYFORCE"
+        ],
+        "jp": [
+          "敵主力艦隊撃破"
+        ],
+        "tw": [
+          "殲滅敵主力部隊"
+        ]
+      }
+    },
+    {
+      "name": "歼灭敌侦查部队",
+      "aliases": {
+        "cn": [
+          "歼灭敌侦查部队"
+        ],
+        "en": [
+          "DESTROYENEMYSCOUTS"
+        ],
+        "jp": [
+          "敵偵察部隊迎撃"
+        ],
+        "tw": [
+          "殲滅敵偵查部隊"
+        ]
+      }
+    },
+    {
+      "name": "歼灭敌精锐部队",
+      "aliases": {
+        "cn": [
+          "歼灭敌精锐部队"
+        ],
+        "en": [
+          "DESTROYENEMYELITES"
+        ],
+        "jp": [
+          "敵精鋭部隊撃破"
+        ],
+        "tw": [
+          "殲滅敵精銳部隊"
+        ]
+      }
+    },
+    {
+      "name": "海域浮标检查作业",
+      "aliases": {
+        "cn": [
+          "海域浮标检查作业"
+        ],
+        "en": [
+          "BUOYINSPECTION"
+        ],
+        "jp": [
+          "海域浮標保守作業"
+        ],
+        "tw": [
+          "海域浮標檢查作業"
+        ]
+      }
+    },
+    {
+      "name": "港区扫除",
+      "aliases": {
+        "cn": [
+          "港区扫除"
+        ]
+      }
+    },
+    {
+      "name": "点亮大屏幕",
+      "aliases": {
+        "cn": [
+          "点亮大屏幕"
+        ]
+      }
+    },
+    {
+      "name": "短距离航行训练",
+      "aliases": {
+        "cn": [
+          "短距离航行训练"
+        ],
+        "en": [
+          "SHORTRANGESAILINGTRAINING"
+        ],
+        "jp": [
+          "短距離練習航海"
+        ],
+        "tw": [
+          "短距離航行訓練"
+        ]
+      }
+    },
+    {
+      "name": "码放待售的换装",
+      "aliases": {
+        "cn": [
+          "码放待售的换装"
+        ]
+      }
+    },
+    {
+      "name": "联合观舰仪式",
+      "aliases": {
+        "cn": [
+          "联合观舰仪式"
+        ],
+        "en": [
+          "FLEETLAUNCHCEREMONY"
+        ],
+        "jp": [
+          "連合艦隊観艦式"
+        ],
+        "tw": [
+          "聯合觀艦儀式"
+        ]
+      }
+    },
+    {
+      "name": "自然调查",
+      "aliases": {
+        "cn": [
+          "自然调查"
+        ]
+      }
+    },
+    {
+      "name": "舰队中阶演习",
+      "aliases": {
+        "cn": [
+          "舰队中阶演习"
+        ],
+        "en": [
+          "FLEETEXERCISEⅡ"
+        ],
+        "jp": [
+          "艦隊慣熟演習"
+        ],
+        "tw": [
+          "艦隊中階演習"
+        ]
+      }
+    },
+    {
+      "name": "舰队初阶演习",
+      "aliases": {
+        "cn": [
+          "舰队初阶演习"
+        ],
+        "en": [
+          "FLEETEXERCISEⅠ"
+        ],
+        "jp": [
+          "装備慣熟演習"
+        ],
+        "tw": [
+          "艦隊初階演習"
+        ]
+      }
+    },
+    {
+      "name": "舰队实战演习",
+      "aliases": {
+        "cn": [
+          "舰队实战演习"
+        ],
+        "en": [
+          "FLEETCOMBATEXERCISE"
+        ],
+        "jp": [
+          "艦隊実弾演習"
+        ],
+        "tw": [
+          "艦隊實戰演習"
+        ]
+      }
+    },
+    {
+      "name": "舰队护卫演习",
+      "aliases": {
+        "cn": [
+          "舰队护卫演习"
+        ],
+        "en": [
+          "FLEETESCORTEXERCISE"
+        ],
+        "jp": [
+          "船団護衛演習"
+        ],
+        "tw": [
+          "艦隊護衛演習"
+        ]
+      }
+    },
+    {
+      "name": "舰队运输演习",
+      "aliases": {
+        "cn": [
+          "舰队运输演习"
+        ],
+        "en": [
+          "FLEETCARGOTRANSPORT"
+        ],
+        "jp": [
+          "艦隊輸送演習"
+        ],
+        "tw": [
+          "艦隊運輸演習"
+        ]
+      }
+    },
+    {
+      "name": "舰队高阶演习",
+      "aliases": {
+        "cn": [
+          "舰队高阶演习"
+        ],
+        "en": [
+          "FLEETEXERCISEⅢ"
+        ],
+        "jp": [
+          "艦隊運動演習"
+        ],
+        "tw": [
+          "艦隊高階演習"
+        ]
+      }
+    },
+    {
+      "name": "补给采购",
+      "aliases": {
+        "cn": [
+          "补给采购"
+        ]
+      }
+    },
+    {
+      "name": "解救商船Ⅰ",
+      "aliases": {
+        "cn": [
+          "解救商船Ⅰ"
+        ],
+        "en": [
+          "MERCHANTRESCUEⅠ"
+        ],
+        "jp": [
+          "船団救出Ⅰ"
+        ],
+        "tw": [
+          "解救商船Ⅰ"
+        ]
+      }
+    },
+    {
+      "name": "解救商船Ⅱ",
+      "aliases": {
+        "cn": [
+          "解救商船Ⅱ"
+        ],
+        "en": [
+          "MERCHANTRESCUEⅡ"
+        ],
+        "jp": [
+          "船団救出Ⅱ"
+        ],
+        "tw": [
+          "解救商船Ⅱ"
+        ]
+      }
+    },
+    {
+      "name": "解救商船Ⅲ",
+      "aliases": {
+        "cn": [
+          "解救商船Ⅲ"
+        ],
+        "en": [
+          "MERCHANTRESCUEⅢ"
+        ],
+        "jp": [
+          "船団救出Ⅲ"
+        ],
+        "tw": [
+          "解救商船Ⅲ"
+        ]
+      }
+    },
+    {
+      "name": "近海防卫巡逻",
+      "aliases": {
+        "cn": [
+          "近海防卫巡逻"
+        ],
+        "en": [
+          "COASTALDEFENSEPATROL"
+        ],
+        "jp": [
+          "近海防衛巡回"
+        ],
+        "tw": [
+          "近海防衛巡邏"
+        ]
+      }
+    },
+    {
+      "name": "远距离航行训练",
+      "aliases": {
+        "cn": [
+          "远距离航行训练"
+        ],
+        "en": [
+          "LONGRANGESAILINGTRAINING"
+        ],
+        "jp": [
+          "外洋練習航海"
+        ],
+        "tw": [
+          "遠距離航行訓練"
+        ]
+      }
+    },
+    {
+      "name": "随着节奏摇摆",
+      "aliases": {
+        "cn": [
+          "随着节奏摇摆"
+        ]
+      }
+    },
+    {
+      "name": "高级林木护卫委托",
+      "aliases": {
+        "cn": [
+          "高级林木护卫委托"
+        ],
+        "en": [
+          "FORESTPROTECTIONCOMMISSIONⅢ"
+        ],
+        "jp": [
+          "上級木材輸送護衛"
+        ],
+        "tw": [
+          "高級林木護衛委託"
+        ]
+      }
+    },
+    {
+      "name": "高级矿脉护卫委托",
+      "aliases": {
+        "cn": [
+          "高级矿脉护卫委托"
+        ],
+        "en": [
+          "VEINPROTECTIONCOMMISSIONⅢ"
+        ],
+        "jp": [
+          "上級鉄鋼輸送護衛"
+        ],
+        "tw": [
+          "高級礦脈護衛委託"
+        ]
+      }
+    },
+    {
+      "name": "高阶对抗演习",
+      "aliases": {
+        "cn": [
+          "高阶对抗演习"
+        ],
+        "en": [
+          "DEFENSEEXERCISEⅢ"
+        ],
+        "jp": [
+          "上級対抗演習"
+        ],
+        "tw": [
+          "高階對抗演習"
+        ]
+      }
+    },
+    {
+      "name": "高阶工具整备",
+      "aliases": {
+        "cn": [
+          "高阶工具整备"
+        ],
+        "en": [
+          "TOOLPREPⅢ"
+        ],
+        "jp": [
+          "上級資材整理"
+        ],
+        "tw": [
+          "高階工具整備"
+        ]
+      }
+    },
+    {
+      "name": "高阶战术研发I",
+      "aliases": {
+        "cn": [
+          "高阶战术研发I",
+          "高阶战术研发Ⅰ"
+        ],
+        "en": [
+          "AWAKENINGTACTICALRESEARCHⅠ"
+        ],
+        "jp": [
+          "覚醒実証研究Ⅰ"
+        ],
+        "tw": [
+          "高階戰術研發Ⅰ"
+        ]
+      }
+    },
+    {
+      "name": "高阶战术研发II",
+      "aliases": {
+        "cn": [
+          "高阶战术研发II",
+          "高阶战术研发Ⅱ"
+        ],
+        "en": [
+          "AWAKENINGTACTICALRESEARCHⅡ"
+        ],
+        "jp": [
+          "覚醒実証研究Ⅱ"
+        ],
+        "tw": [
+          "高階戰術研發Ⅱ"
+        ]
+      }
+    },
+    {
+      "name": "高阶战术课程",
+      "aliases": {
+        "cn": [
+          "高阶战术课程"
+        ],
+        "en": [
+          "TACTICALCLASSⅢ"
+        ],
+        "jp": [
+          "上級戦術課程"
+        ],
+        "tw": [
+          "高階戰術課程"
+        ]
+      }
+    },
+    {
+      "name": "高阶科研任务",
+      "aliases": {
+        "cn": [
+          "高阶科研任务"
+        ],
+        "en": [
+          "RESEARCHMISSIONⅢ"
+        ],
+        "jp": [
+          "上級科学研究"
+        ],
+        "tw": [
+          "高階科研任務"
+        ]
+      }
+    },
+    {
+      "name": "高阶自主训练",
+      "aliases": {
+        "cn": [
+          "高阶自主训练"
+        ],
+        "en": [
+          "SELFTRAININGⅢ"
+        ],
+        "jp": [
+          "上級自主訓練"
+        ],
+        "tw": [
+          "高階自主訓練"
+        ]
+      }
+    },
+    {
+      "name": "高阶货物运输",
+      "aliases": {
+        "cn": [
+          "高阶货物运输"
+        ],
+        "en": [
+          "CARGOTRANSPORTⅢ"
+        ],
+        "jp": [
+          "上級貨物輸送"
+        ],
+        "tw": [
+          "高階貨物運輸"
+        ]
+      }
+    }
+  ]
+}

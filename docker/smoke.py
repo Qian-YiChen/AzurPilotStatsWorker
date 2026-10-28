@@ -33,7 +33,7 @@ def main():
             source, target = work / "request.json", work / "result.json"
             source.write_text(json.dumps(request), encoding="utf-8")
             target.unlink(missing_ok=True)
-            pool.recognize(source,target,'cn',timeout=180)
+            pool.recognize(source,target,request['source']['metadata']['server'],timeout=180)
             return json.loads(target.read_text(encoding="utf-8"))
 
         first = parse()
@@ -91,7 +91,7 @@ def main():
 
         # An odd reward row can have a dark Oil icon in the middle. Brightness
         # based parity used the even grid, shifting every crop by half a slot.
-        commission = Image.open(root / 'assets/cn/combat/GET_ITEMS_1.png').convert('RGB')
+        commission = Image.open(root / 'assets/en/combat/GET_ITEMS_1.png').convert('RGB')
         for x, name in [(464,'DecorCoins'), (592,'Oil'), (720,'BoxT2')]:
             icon = Image.open(root / f'assets/stats/commission_items/{name}.png').convert('RGB')
             draw = ImageDraw.Draw(icon)
@@ -100,11 +100,19 @@ def main():
             commission.paste(icon,(x,298))
         commission_path=work/'commission.png'
         commission.save(commission_path)
-        request['source']['metadata'].update(project='drop',scene='commission')
-        request['files']=[str(commission_path)]
+        success = Image.open(root / 'assets/en/azur_stats/COMMISSION_DONE.png').convert('RGB')
+        draw = ImageDraw.Draw(success)
+        draw.rectangle((293,162,592,182), fill='black')
+        draw.text((305,162), 'Small Merchant Escort', font=ImageFont.load_default(size=20), fill='white')
+        success_path = work/'commission_success.png'
+        success.save(success_path)
+        request['source']['metadata'].update(project='drop',scene='commission',server='en')
+        request['files']=[str(success_path), str(commission_path), str(success_path), str(commission_path)]
         request['templates']=[]
         fixed=parse()
         assert fixed['status']=='complete' and not fixed['candidates'],fixed
+        assert len(fixed['events']) == 1 and fixed['events'][0]['project'] == '小型商船护卫', fixed
+        assert any(entry['reason'] == 'duplicate_commission' for entry in fixed['skipped_frames']), fixed
         assert {item['item']:item['amount'] for item in fixed['events'][0]['items']}=={'DecorCoins':1,'Oil':1,'BoxT2':1},fixed
         pool.close()
     print("Offline OCR and template smoke test passed")

@@ -50,16 +50,24 @@ def research_focus(image, series_list):
     return next((int(s) for s in series_list if s and series_list.count(s) >= 3), 0)
 
 
-def frames(paths, diagnostics):
+def frames(paths, diagnostics, recover=False):
     import numpy as np
     from PIL import Image
     for file_index, path in enumerate(paths):
-        with Image.open(path) as png:
-            if png.format != "PNG" or png.width != 1280 or png.height % 720 or not 1 <= png.height // 720 <= 10:
-                diagnostics.append(f"file:{file_index}:unsupported_resolution")
-                continue
-            for index in range(png.height // 720):
-                yield file_index, index, np.asarray(png.crop((0, index * 720, 1280, (index + 1) * 720)).convert("RGB"))
+        try:
+            with Image.open(path) as png:
+                if png.format != "PNG" or png.width != 1280 or png.height % 720 or not 1 <= png.height // 720 <= 10:
+                    diagnostics.append(f"file:{file_index}:unsupported_resolution")
+                    if recover:
+                        yield file_index, 0, None
+                    continue
+                for index in range(png.height // 720):
+                    yield file_index, index, np.asarray(png.crop((0, index * 720, 1280, (index + 1) * 720)).convert("RGB"))
+        except (OSError, ValueError) as exc:
+            if not recover:
+                raise
+            diagnostics.append(f"file:{file_index}:unreadable_image:{type(exc).__name__}")
+            yield file_index, 0, None
 
 
 def recognize(request):
@@ -152,6 +160,13 @@ def recognize(request):
         return tracked_match
     for grid in grids:
         grid.match_template = track(grid.match_template)
+    if not research and meta["scene"].startswith("commission"):
+        if __package__:
+            from .commission import NativeCommissionReader, recognize_commissions
+        else:
+            from commission import NativeCommissionReader, recognize_commissions
+        return recognize_commissions(frames(request["files"], diagnostics, recover=True),
+                                     NativeCommissionReader(stats, meta["server"]), used, diagnostics)
     candidates = []
     events = []
     # Repeated reward pages can overlap. The upstream merger identifies the
