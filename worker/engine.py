@@ -157,13 +157,13 @@ class Engine:
             total = 0
             for file in source["files"]:
                 path = directory / f"{file['index']}.png"
-                digest = hashlib.sha256()
-                size = 0
+                # hashlib.file_digest hashes in C over the file object: one call,
+                # no Python chunk loop and no GIL-only work while OCR saturates
+                # the CPU. The old loop took over a second under load.
                 with path.open("rb") as handle:
-                    for block in iter(lambda: handle.read(65536), b""):
-                        size += len(block)
-                        digest.update(block)
-                if size != file["size"] or digest.hexdigest() != file["sha256"]:
+                    digest = hashlib.file_digest(handle, "sha256").hexdigest()
+                size = path.stat().st_size
+                if size != file["size"] or digest != file["sha256"]:
                     raise ValueError(f"index {file['index']} hash/size mismatch")
                 total += size
             self.db.advance(job, 'verified')

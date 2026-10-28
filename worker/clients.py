@@ -98,7 +98,7 @@ class Pan:
                 if response.status_code in (429, 500, 502, 503, 504):
                     raise Retryable(f"download HTTP {response.status_code}")
                 response.raise_for_status()
-                for block in response.iter_bytes(65536):
+                for block in response.iter_bytes(1 << 20):
                     size += len(block)
                     if size > file["size"] or size > self.config.file_bytes:
                         raise ValueError("Downloaded file exceeds expected size")
@@ -168,7 +168,7 @@ class WebDAV:
                         # never become part of a persisted job error/traceback.
                         raise RuntimeError(f"WebDAV download HTTP {response.status_code}")
                     with path.open("wb") as dst:
-                        for block in response.iter_bytes(65536):
+                        for block in response.iter_bytes(1 << 20):
                             size += len(block)
                             if size > file["size"] or size > self.config.file_bytes:
                                 raise ValueError("Downloaded file exceeds expected size")
