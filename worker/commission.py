@@ -72,7 +72,7 @@ class NativeCommissionReader:
 
 
 def recognize_commissions(frame_iterator, reader, used_templates, diagnostics):
-    """Accept one success/reward pair and deduplicate full records within a group."""
+    """Parse one source group in file/frame order, independently of its batch."""
     events, skipped = [], []
     pending = None
     seen = set()
@@ -105,6 +105,7 @@ def recognize_commissions(frame_iterator, reader, used_templates, diagnostics):
             skip(current["location"], "commission_event_limit")
             return
         seen.add(signature)
+        # C groups drop statistics by event.project; source metadata stays drop/commission.
         events.append({"event_type": "drop", "series": 0, "project": current["name"], "focus_series": 0,
                        "duration_seconds": 0, "items": current["items"]})
 

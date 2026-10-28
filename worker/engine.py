@@ -108,7 +108,18 @@ class Engine:
                 if set(overrides) - {"project", "scene"} or any(not isinstance(v, str) or len(v) > 128 for v in overrides.values()):
                     raise ValueError("Invalid inferred metadata")
                 source["metadata"].update(overrides)
-                result = {"sha256": source["sha256"], "revision": revision, "status": parsed["status"], "parser_version": "azurpilot-adapter-v3", "template_release": release_id, "source": source, "events": parsed["events"], "diagnostics": parsed["diagnostics"], "candidate_ids": sorted({c["id"] for c in parsed["candidates"]}), "used_templates": parsed["used_templates"]}
+                result = {
+                    "sha256": source["sha256"],
+                    "revision": revision,
+                    "status": parsed["status"],
+                    "parser_version": "azurpilot-adapter-v3",
+                    "template_release": release_id,
+                    "source": source,
+                    "events": parsed["events"],
+                    "diagnostics": parsed["diagnostics"],
+                    "candidate_ids": sorted({c["id"] for c in parsed["candidates"]}),
+                    "used_templates": parsed["used_templates"],
+                }
                 self.db.save_result(job, result, parsed["candidates"])
                 candidates = parsed["candidates"]
             else:
