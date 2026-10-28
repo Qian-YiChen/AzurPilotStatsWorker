@@ -84,3 +84,28 @@ def test_restart_redownloads_intermediate_files_but_preserves_saved_results(tmp_
         assert json.loads(db.claim_stage('delivery')['result'])['revision'] == 4
     finally:
         db.close()
+
+
+def test_memory_cache_cleanup_also_removes_disk_request_files(tmp_path):
+    db = Database(tmp_path / 'state.sqlite')
+    engine = Engine(config(tmp_path), db)
+    try:
+        engine.memory_work = tmp_path / 'ram'
+        engine.memory_jobs.add(12)
+        engine.reservations[12] = 8
+        cached = engine.workdir({'id': 12})
+        disk = engine.work / '12'
+        cached.mkdir(parents=True)
+        disk.mkdir()
+        (cached / '0.png').write_bytes(b'original')
+        (disk / 'recognize.input.json').write_text('{}')
+        engine.cleanup({'id': 12})
+        assert not cached.exists() and not disk.exists()
+        assert engine.performance()['memory_cached'] == 0
+        assert engine.performance()['work_reserved'] == 0
+    finally:
+        for executor in (*engine.executors.values(), engine.scheduler, engine.management):
+            executor.shutdown()
+        engine.stats.client.close()
+        engine.pan.client.close()
+        db.close()

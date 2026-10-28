@@ -129,7 +129,8 @@ class Engine:
         root = getattr(self, 'work', None)
         if root is None:
             return
-        shutil.rmtree(self.workdir(job), ignore_errors=True)
+        for directory in {self.workdir(job), self.work / str(job['id'])}:
+            shutil.rmtree(directory, ignore_errors=True)
         with self.disk_lock:
             self.reservations.pop(job['id'], None)
             self.memory_jobs.discard(job['id'])
@@ -173,7 +174,10 @@ class Engine:
         return False
 
     def run_recognizer(self, request, job, stage):
-        directory = self.workdir(job)
+        # Only PNG bytes consume the bounded shared-memory cache. Template
+        # packages and candidate JSON may be much larger than a screenshot.
+        directory = self.work / str(job['id'])
+        directory.mkdir(parents=True, exist_ok=True)
         input_path = directory / f'{stage}.input.json'
         output_path = directory / f'{stage}.output.json'
         input_path.write_text(json.dumps(request), encoding='utf-8')
