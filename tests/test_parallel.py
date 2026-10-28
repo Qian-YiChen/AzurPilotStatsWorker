@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 import sys
 import threading
+import time
 
 import pytest
 
@@ -99,34 +100,48 @@ for line in sys.stdin:
     assert not pool.processes
 
 
-def test_scheduler_overlaps_jobs_and_drains_on_shutdown(tmp_path):
+def test_staged_pipeline_advances_jobs_and_drains_on_shutdown(tmp_path):
     from dataclasses import replace
     db = Database(tmp_path/'state.sqlite')
     db.accept(batch(4))
-    engine = Engine(replace(config(tmp_path),recognition_workers=2,prefetch_jobs=1), db)
-    started, release = threading.Event(), threading.Event()
-    lock = threading.Lock()
-    active, peak = 0, 0
+    engine = Engine(replace(config(tmp_path), download_workers=2, verify_workers=1,
+                            ocr_slots=2, deliver_workers=1), db)
     engine.synchronize = lambda: None
-    def process(job):
-        nonlocal active, peak
-        with lock:
-            active += 1; peak=max(peak,active)
-            if active >= 2: started.set()
-        release.wait(5)
-        db.finish(job)
-        with lock: active -= 1
-    engine.process = process
+    seen = []
+    lock = threading.Lock()
+
+    def stage(name, advance):
+        def handler(job):
+            with lock:
+                seen.append(name)
+            advance(job)
+        return handler
+
+    def recognized(job):
+        source = json.loads(job['source'])
+        db.save_result(job, {'sha256': source['sha256'], 'revision': 1, 'status': 'complete',
+                             'template_release': 0, 'source': source, 'events': [],
+                             'diagnostics': [], 'candidate_ids': [], 'used_templates': []}, [])
+        db.advance(job, 'delivery')
+    engine.stage_download = stage('download', lambda job: db.advance(job, 'downloaded'))
+    engine.stage_verify = stage('verify', lambda job: db.advance(job, 'verified'))
+    engine.stage_recognize = stage('recognize', recognized)
+    engine.stage_deliver = stage('deliver', lambda job: db.finish(job))
+
     async def run():
-        task=asyncio.create_task(engine.run())
+        task = asyncio.create_task(engine.run())
         try:
-            assert await asyncio.to_thread(started.wait,5)
+            deadline = time.time() + 8
+            while db.pending() and time.time() < deadline:
+                await asyncio.sleep(0.05)
         finally:
             task.cancel()
-            release.set()
-            with pytest.raises(asyncio.CancelledError): await task
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
     asyncio.run(run())
-    assert peak >= 2 and active == 0
+    assert sorted(set(seen)) == ['deliver', 'download', 'recognize', 'verify']
+    assert db.pending() == 0
     assert db.db.execute('SELECT count(*) FROM jobs WHERE active=1').fetchone()[0] == 0
     db.close()
 

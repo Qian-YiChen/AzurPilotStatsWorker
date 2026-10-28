@@ -34,7 +34,21 @@ A 只有 HTTP/NAT 入口时，使用 SSH 转发加密传输（见 [部署示例]
 
 ## 并发与吞吐
 
-`RECOGNITION_WORKERS=0` 根据 CPU 配额与内存自动选择 OCR 进程数；也可显式设置 1–32。每进程默认 `OCR_THREADS=1`，避免多个模型线程池争抢核心。`PREFETCH_JOBS=0` 在 OCR 进程数之外预取半数任务（至少一个），使下载、识别和结果回传重叠；工作任务数始终有上限，原图流式落盘。健康检查返回实际 `recognition_workers / job_slots`。
+处理流程拆成互相独立的阶段池，每个池只领取自己的状态，谁也不会占着别人的槽：
+
+| 阶段 | 配置 | 默认 | 工作内容 |
+|---|---|---|---|
+| 下载 | `DOWNLOAD_WORKERS` | 64 | 从 123 盘流式拉原图，单文件失败原地重试 |
+| 校验 | `VERIFY_WORKERS` | 4 | 落盘后重新核对大小与 SHA-256 |
+| 识别 | `OCR_SLOTS` / `OCR_PROCESSES` | 32 槽 / 自动 | 常驻进程做 OpenCV 与 OCR 解析 |
+| 回传 | `DELIVER_WORKERS` | 4 | 提交候选图与结构化结果到 C |
+| 通信 | 固定 1 | 1 | 心跳、模板同步、指令、A 的 WebSocket |
+
+阶段状态写在 SQLite（`pending → downloaded → verified → delivery → done`），重启后从各自阶段继续。`DOWNLOAD_AHEAD`（默认 128 组）限制“已下载但未识别”的积压，超过就暂停下载，磁盘不会失控。`PIPELINE=inline` 可回退到旧的单车道调度。
+
+领取任务全部在线程里执行，不在 asyncio 事件循环上做 SQLite 写入，因此 `/healthz` 在满载时仍能立即响应。日志按阶段输出：`stage=download/verify/recognize/deliver`，以及每 30 秒一条 `stage=depth` 显示各阶段积压。
+
+`OCR_THREADS=1` 避免多个模型线程池争抢核心；`OCR_PROCESSES=0` 时按 CPU 配额与内存自动选择常驻识别进程数（1–32）。健康检查返回 `stages / recognition_workers / job_slots / pipeline`。
 
 识别进程保留 OCR 模型、模块和有界基础图标缓存，每份任务仍创建独立解析状态并使用固定模板快照。区服改变、超时、崩溃或处理满 `OCR_PROCESS_MAX_JOBS`（默认 1000）后重建进程。模板发布和回滚不要求重启模型，不会继承上一任务的在线模板或原图。
 

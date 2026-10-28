@@ -1,7 +1,9 @@
-"""Bounded resident OCR processes; only private job paths cross stdin.
+"""Bounded resident recognizer processes; only private job paths cross stdin.
 
 Each process handles one request at a time and is replaced on timeout, crash,
 region change or periodic retirement. It never owns the scheduler's SQLite DB.
+OpenCV and OCR stages own separate pools, so one stage can never starve the
+other by occupying its processes.
 """
 import json
 import math
@@ -14,7 +16,8 @@ import threading
 import time
 
 
-def automatic_workers():
+def hardware():
+    """CPU count and memory budget for the worker pools."""
     cpus = getattr(os, 'process_cpu_count', os.cpu_count)() or 1
     try:
         quota, period = Path('/sys/fs/cgroup/cpu.max').read_text().split()
@@ -34,14 +37,32 @@ def automatic_workers():
             memory = os.sysconf('SC_PHYS_PAGES') * os.sysconf('SC_PAGE_SIZE')
         except (AttributeError, OSError, ValueError):
             pass
+    return max(1, cpus), memory
+
+
+def automatic_workers():
+    cpus, memory = hardware()
     # Leave the API, SQLite, transient arrays and OS headroom outside each lane.
     by_memory = max(1, (memory - 256 * 1024**2) // (384 * 1024**2))
     return max(1, min(cpus, by_memory, 32))
 
 
+def stage_processes(requested):
+    """Resident process count for one stage, bounded by the real hardware.
+
+    Slots (in-flight groups) can exceed this: the extra entries queue in the
+    stage instead of each pinning hundreds of MiB of OCR runtime.
+    """
+    if requested:
+        return max(1, min(requested, automatic_workers() * 2))
+    cpus, memory = hardware()
+    by_memory = max(1, (memory - 512 * 1024**2) // (384 * 1024**2))
+    return max(1, min(cpus, by_memory // 2, 32))
+
+
 class RecognizerPool:
-    def __init__(self, size, threads=1):
-        self.size, self.threads = size, threads
+    def __init__(self, size, threads=1, stage='recognize'):
+        self.size, self.threads, self.stage = size, threads, stage
         self.slots = queue.LifoQueue()
         for _ in range(size):
             self.slots.put(None)
@@ -66,7 +87,7 @@ class RecognizerPool:
         with self.lock:
             self.processes.discard(process)
 
-    def recognize(self, input_path, output_path, server, timeout=600):
+    def run(self, input_path, output_path, server, timeout=600):
         region = 'cn' if server.startswith('cn') else server
         process = self.slots.get()
         try:
@@ -76,6 +97,7 @@ class RecognizerPool:
                 for key in ('OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS',
                             'NUMEXPR_NUM_THREADS', 'AZURPILOT_OCR_THREADS'):
                     env[key] = str(self.threads)
+                env['RECOGNIZER_STAGE'] = self.stage
                 process = subprocess.Popen(
                     [os.getenv('ALAS_PYTHON', sys.executable), str(Path(__file__).with_name('recognize.py')), '--serve'],
                     stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -101,6 +123,10 @@ class RecognizerPool:
             raise
         finally:
             self.slots.put(process)
+
+    # Kept for compatibility with existing callers and tests.
+    def recognize(self, input_path, output_path, server, timeout=600):
+        return self.run(input_path, output_path, server, timeout)
 
     def close(self):
         with self.lock:

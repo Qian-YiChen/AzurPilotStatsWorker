@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import time
 import threading
 import re
@@ -6,6 +7,31 @@ from pathlib import Path
 from urllib.parse import urlparse, urljoin
 
 import httpx
+
+log = logging.getLogger(__name__)
+
+# 123 Pan drops connections under load. Retry the same original in place so a
+# single timeout cannot fail a whole group and re-download every image.
+TRANSIENT = (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout, httpx.WriteError,
+             httpx.RemoteProtocolError, httpx.ProxyError)
+
+
+class Retryable(Exception):
+    """Transient cloud response; the same original download is attempted again."""
+
+
+def retrying(operation, attempts=3):
+    delay = 0.25
+    for attempt in range(1, attempts + 1):
+        try:
+            return operation()
+        except TRANSIENT + (Retryable,) as exc:
+            if attempt == attempts:
+                raise
+            # Signed download URLs must never reach the logs, so log the type.
+            log.warning('download retry attempt=%s error=%s', attempt, type(exc).__name__)
+            time.sleep(delay)
+            delay *= 2
 
 
 class Statistics:
@@ -61,11 +87,16 @@ class Pan:
     def download(self, file, path: Path):
         with self.control_lock:
             url = self.download_url(file)
+        retrying(lambda: self._download(url, file, path))
+
+    def _download(self, url, file, path: Path):
         digest = hashlib.sha256()
         size = 0
         try:
             # Control credentials never accompany the CDN request.
             with self.client.stream("GET", url, follow_redirects=True) as response, path.open("wb") as dst:
+                if response.status_code in (429, 500, 502, 503, 504):
+                    raise Retryable(f"download HTTP {response.status_code}")
                 response.raise_for_status()
                 for block in response.iter_bytes(65536):
                     size += len(block)
@@ -112,7 +143,9 @@ class WebDAV:
     def download(self, file, path: Path):
         if not re.fullmatch(r"[0-9a-f]{64}", file["sha256"]):
             raise ValueError("Invalid original hash")
-        url = self.base_url + file["sha256"] + ".png"
+        retrying(lambda: self._download(self.base_url + file["sha256"] + ".png", file, path))
+
+    def _download(self, url, file, path: Path):
         digest = hashlib.sha256()
         size = 0
         try:
@@ -128,6 +161,8 @@ class WebDAV:
                             raise ValueError("WebDAV redirect has no location")
                         url = urljoin(str(target), location)
                         continue
+                    if response.status_code in (429, 502, 503, 504):
+                        raise Retryable(f"WebDAV download HTTP {response.status_code}")
                     if response.status_code != 200:
                         # Signed CDN query strings and account credentials must
                         # never become part of a persisted job error/traceback.

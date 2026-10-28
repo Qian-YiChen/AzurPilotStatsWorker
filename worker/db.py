@@ -9,6 +9,10 @@ import time
 
 HEX = re.compile(r"^[0-9a-f]{64}$")
 
+# Pipeline stages, in order. Delivery keeps the historical name so existing
+# databases and saved results stay compatible.
+STAGES = ('pending', 'downloaded', 'verified', 'matched', 'recognized', 'delivery')
+
 
 def validate_source(source, file_bytes=10 * 1024**2, group_bytes=500 * 1024**2):
     files = source["files"]
@@ -42,11 +46,22 @@ class Database:
         CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);
         UPDATE commands SET state='pending' WHERE state='processing';
         """)
-        if 'active' not in {row[1] for row in self.db.execute('PRAGMA table_info(jobs)')}:
-            self.db.execute('ALTER TABLE jobs ADD COLUMN active INTEGER NOT NULL DEFAULT 0')
+        columns = {row[1] for row in self.db.execute('PRAGMA table_info(jobs)')}
+        for name, definition in (('active', 'INTEGER NOT NULL DEFAULT 0'),
+                                 ('attempts', 'INTEGER NOT NULL DEFAULT 0'),
+                                 ('partial', 'TEXT'),
+                                 ('snapshot', 'TEXT'),
+                                 ('opencv_ms', 'INTEGER NOT NULL DEFAULT 0'),
+                                 ('ocr_ms', 'INTEGER NOT NULL DEFAULT 0'),
+                                 ('download_ms', 'INTEGER NOT NULL DEFAULT 0')):
+            if name not in columns:
+                self.db.execute(f'ALTER TABLE jobs ADD COLUMN {name} {definition}')
         with self.db:
-            self.db.execute("UPDATE jobs SET active=0,state=CASE WHEN result IS NULL THEN 'pending' ELSE 'delivery' END WHERE state='processing' OR active=1")
+            # Interrupted work is resumed from its durable stage. A job that
+            # already stored a final result only needs its delivery retried.
+            self.db.execute("UPDATE jobs SET active=0,state=CASE WHEN result IS NOT NULL THEN 'delivery' ELSE 'pending' END WHERE state='processing' OR active=1")
             self.db.execute('CREATE INDEX IF NOT EXISTS jobs_active_sha ON jobs(sha) WHERE active=1')
+            self.db.execute('CREATE INDEX IF NOT EXISTS jobs_stage ON jobs(state,retry_at)')
 
     def close(self):
         with self.lock:
@@ -73,9 +88,54 @@ class Database:
                 self.db.execute("UPDATE jobs SET active=1,state=CASE WHEN state='pending' THEN 'processing' ELSE state END WHERE id=?", (row['id'],))
             return dict(row) if row else None
 
-    def save_result(self, job, result, candidates):
+    def claim_stage(self, state):
+        """Lease one job of a pipeline stage; every stage claims its own state."""
         with self.lock, self.db:
-            self.db.execute("UPDATE jobs SET state='delivery',result=?,candidates=?,error='' WHERE id=?", (json.dumps(result), json.dumps(candidates), job["id"]))
+            row = self.db.execute(
+                "SELECT j.* FROM jobs j WHERE j.active=0 AND j.state=? AND j.retry_at<=? "
+                "AND NOT EXISTS(SELECT 1 FROM jobs busy WHERE busy.sha=j.sha AND busy.active=1) "
+                "ORDER BY CASE WHEN j.task LIKE 'command:%' THEN 0 ELSE 1 END,id LIMIT 1", (state, time.time())).fetchone()
+            if row:
+                self.db.execute("UPDATE jobs SET active=1 WHERE id=?", (row['id'],))
+            return dict(row) if row else None
+
+    def advance(self, job, state, partial=None):
+        with self.lock, self.db:
+            if partial is None:
+                self.db.execute("UPDATE jobs SET state=?,active=0,error='',attempts=0 WHERE id=?", (state, job['id']))
+            else:
+                self.db.execute("UPDATE jobs SET state=?,active=0,error='',attempts=0,partial=? WHERE id=?",
+                                (state, json.dumps(partial), job['id']))
+
+    def retry_stage(self, job, state, error):
+        attempts = int(job.get('attempts') or 0) + 1
+        delay = min(300, 10 * attempts)
+        with self.lock, self.db:
+            self.db.execute("UPDATE jobs SET state=?,active=0,attempts=?,retry_at=?,error=? WHERE id=?",
+                            (state, attempts, time.time() + delay, str(error)[:2000], job['id']))
+
+    def partial(self, job):
+        return json.loads(job['partial']) if job.get('partial') else None
+
+    def timed(self, job, column, milliseconds):
+        if column not in ('download_ms', 'opencv_ms', 'ocr_ms'):
+            raise ValueError('Invalid stage timing column')
+        with self.lock, self.db:
+            self.db.execute(f"UPDATE jobs SET {column}={column}+? WHERE id=?", (int(milliseconds), job['id']))
+
+    def count_states(self, states):
+        placeholders = ','.join('?' for _ in states)
+        with self.lock:
+            return self.db.execute(f"SELECT count(*) FROM jobs WHERE state IN ({placeholders})", tuple(states)).fetchone()[0]
+
+    def stage_counts(self):
+        with self.lock:
+            return dict(self.db.execute("SELECT state,count(*) FROM jobs GROUP BY state"))
+
+    def save_result(self, job, result, candidates, snapshot=None):
+        with self.lock, self.db:
+            self.db.execute("UPDATE jobs SET state='delivery',result=?,candidates=?,snapshot=?,error='',partial=NULL WHERE id=?",
+                            (json.dumps(result), json.dumps(candidates), json.dumps(snapshot) if snapshot is not None else None, job["id"]))
 
     def finish(self, job):
         with self.lock, self.db:

@@ -23,10 +23,28 @@ class Config:
     recognition_workers: int = 0
     ocr_threads: int = 1
     prefetch_jobs: int = 0
+    # Stage pipeline: every stage owns its workers and its queue.
+    download_workers: int = 64
+    verify_workers: int = 4
+    ocr_slots: int = 32
+    deliver_workers: int = 4
+    download_ahead: int = 128
+    ocr_processes: int = 0
+    pipeline: str = "staged"
 
     def __post_init__(self):
         if not 0 <= self.recognition_workers <= 32 or not 1 <= self.ocr_threads <= 16 or not 0 <= self.prefetch_jobs <= 32:
             raise ValueError('Invalid recognition concurrency')
+        if not 1 <= self.download_workers <= 256 or not 1 <= self.verify_workers <= 32:
+            raise ValueError('Invalid download/verify concurrency')
+        if not 1 <= self.ocr_slots <= 128 or not 1 <= self.deliver_workers <= 32:
+            raise ValueError('Invalid ocr/delivery concurrency')
+        if not 0 <= self.ocr_processes <= 64:
+            raise ValueError('Invalid recognizer process count')
+        if not 1 <= self.download_ahead <= 1024:
+            raise ValueError('Invalid download-ahead group limit')
+        if self.pipeline not in ('staged', 'inline'):
+            raise ValueError('PIPELINE must be staged or inline')
         if self.file_bytes < 8 or self.group_bytes < self.file_bytes:
             raise ValueError("Invalid file/group limits")
         if self.uploader_url:
@@ -48,4 +66,30 @@ class Config:
         missing = [k for k in required if not os.getenv(k)]
         if missing:
             raise ValueError("Missing configuration: " + ", ".join(missing))
-        return cls(Path(os.getenv("DATA_DIR", "data")).resolve(), os.environ["WORKER_TOKEN"], os.environ["STATISTICS_URL"].rstrip("/"), os.environ["STATISTICS_TOKEN"], os.getenv("WORKER_ID", "recognizer-1"), os.getenv("PAN_CLIENT_ID", ""), os.getenv("PAN_CLIENT_SECRET", ""), os.getenv("PAN_API_BASE", "https://open-api.123pan.com"), Path(os.environ["ALAS_ROOT"]).resolve(), int(os.getenv("MAX_FILE_BYTES", str(10 * 1024**2))), int(os.getenv("MAX_GROUP_BYTES", str(500 * 1024**2))), os.getenv("UPLOADER_WS_URL", ""), os.getenv("WEBDAV_URL", "").rstrip("/"), os.getenv("WEBDAV_USERNAME", ""), os.getenv("WEBDAV_PASSWORD", ""), int(os.getenv('RECOGNITION_WORKERS', '0')), int(os.getenv('OCR_THREADS', '1')), int(os.getenv('PREFETCH_JOBS', '0')))
+        return cls(
+            Path(os.getenv("DATA_DIR", "data")).resolve(),
+            os.environ["WORKER_TOKEN"],
+            os.environ["STATISTICS_URL"].rstrip("/"),
+            os.environ["STATISTICS_TOKEN"],
+            os.getenv("WORKER_ID", "recognizer-1"),
+            os.getenv("PAN_CLIENT_ID", ""),
+            os.getenv("PAN_CLIENT_SECRET", ""),
+            os.getenv("PAN_API_BASE", "https://open-api.123pan.com"),
+            Path(os.environ["ALAS_ROOT"]).resolve(),
+            int(os.getenv("MAX_FILE_BYTES", str(10 * 1024**2))),
+            int(os.getenv("MAX_GROUP_BYTES", str(500 * 1024**2))),
+            os.getenv("UPLOADER_WS_URL", ""),
+            os.getenv("WEBDAV_URL", "").rstrip("/"),
+            os.getenv("WEBDAV_USERNAME", ""),
+            os.getenv("WEBDAV_PASSWORD", ""),
+            int(os.getenv('RECOGNITION_WORKERS', '0')),
+            int(os.getenv('OCR_THREADS', '1')),
+            int(os.getenv('PREFETCH_JOBS', '0')),
+            int(os.getenv('DOWNLOAD_WORKERS', '64')),
+            int(os.getenv('VERIFY_WORKERS', '4')),
+            int(os.getenv('OCR_SLOTS', '32')),
+            int(os.getenv('DELIVER_WORKERS', '4')),
+            int(os.getenv('DOWNLOAD_AHEAD', '128')),
+            int(os.getenv('OCR_PROCESSES', '0')),
+            os.getenv('PIPELINE', 'staged'),
+        )
