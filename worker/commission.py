@@ -27,16 +27,12 @@ def name_catalog():
     return aliases
 
 
-def resolve_name(value, server, suffix=None):
+def resolve_name(value, server):
     server = "cn" if server.startswith("cn") else server
     name = normalize_name(value)
     variants = {name}
     if name.endswith("1"):
         variants.add(name[:-1] + "I")
-    if suffix:
-        suffix = normalize_name(suffix).replace("1", "I").replace("J", "I")
-        if suffix in {"I", "II", "III", "IV", "V", "VI"}:
-            variants.add(re.sub(r"[IVX1]+$", "", name) + suffix)
     matches = {name_catalog().get((server, variant)) for variant in variants} - {None}
     if len(matches) != 1:
         raise ValueError("unknown_or_ambiguous_commission_name")
@@ -45,17 +41,10 @@ def resolve_name(value, server, suffix=None):
 
 class NativeCommissionReader:
     def __init__(self, stats, server):
-        import numpy as np
         from module.azur_stats.assets import COMMISSION_DONE, COMMISSION_NAME, COMMISSION_PERFECT
         from module.combat.assets import GET_ITEMS_1, GET_ITEMS_2, GET_ITEMS_3
         from module.ocr.ocr import Ocr
         from module.ui.assets import COMMISSION_CHECK
-
-        class SuffixOcr(Ocr):
-            def pre_process(self, image):
-                image = super().pre_process(image)
-                ink = np.where(np.min(image[5:-5], axis=0) < 85)[0]
-                return image[:, max(0, int(ink[-1]) - 20):] if len(ink) else image
 
         self.stats = stats
         self.server = "cn" if server.startswith("cn") else server
@@ -64,7 +53,6 @@ class NativeCommissionReader:
         self.exit_marker = COMMISSION_CHECK
         language = {"cn": "cnocr", "en": "ppocr_v6", "jp": "jp", "tw": "tw"}[self.server]
         self.name_ocr = Ocr(COMMISSION_NAME, lang=language, name="Commission_name")
-        self.suffix_ocr = SuffixOcr(COMMISSION_NAME, lang="azur_lane", alphabet="IV1J", name="Commission_suffix")
 
     def classify(self, image):
         for status, marker in zip(("success", "perfect"), self.success_markers):
@@ -77,14 +65,7 @@ class NativeCommissionReader:
         return "unknown"
 
     def read_name(self, image):
-        name = self.name_ocr.ocr(image)
-        try:
-            resolved = resolve_name(name, self.server)
-        except ValueError:
-            return resolve_name(name, self.server, self.suffix_ocr.ocr(image))
-        if re.search(r"[IVX]+$", normalize_name(resolved)):
-            return resolve_name(name, self.server, self.suffix_ocr.ocr(image))
-        return resolved
+        return resolve_name(self.name_ocr.ocr(image), self.server)
 
     def read_items(self, image):
         return self.stats.stats_get_items(image, tag=True)

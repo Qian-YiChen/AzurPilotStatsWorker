@@ -1,10 +1,11 @@
 import json
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 from PIL import Image
 import pytest
 
-from worker.commission import recognize_commissions, resolve_name
+from worker.commission import NativeCommissionReader, recognize_commissions, resolve_name
 from worker.db import Database
 from worker.engine import Engine
 from worker.recognize import frames, run_request
@@ -47,22 +48,31 @@ def parse(images):
     ("Small Merchant Escort", "en", "小型商船护卫"),
     ("小型商船護衛", "tw", "小型商船护卫"),
     ("小型船団護衛", "jp", "小型商船护卫"),
+    ("解救商船II", "cn", "解救商船Ⅱ"),
 ])
 def test_names_use_existing_language_aliases_and_normalize_suffixes(raw, server, expected):
     assert resolve_name(raw, server) == expected
 
 
-def test_uncertain_name_is_rejected_and_suffix_can_recover_missing_numerals():
+def test_unknown_name_or_missing_numerals_are_rejected():
     with pytest.raises(ValueError):
         resolve_name("unrecognized commission", "en")
-    assert resolve_name("日常资源开发", "cn", "III") == "日常资源开发III"
-
-
-def test_conflicting_numeral_readings_and_shared_aliases_are_not_guessed():
     with pytest.raises(ValueError):
-        resolve_name("日常资源开发I", "cn", "II")
+        resolve_name("日常资源开发", "cn")
+
+
+def test_shared_language_aliases_are_not_guessed():
     with pytest.raises(ValueError):
         resolve_name("BIW要人護衛", "jp")
+
+
+def test_name_reader_uses_one_whole_line_result_without_suffix_ocr():
+    reader = NativeCommissionReader.__new__(NativeCommissionReader)
+    reader.server = "cn"
+    reader.name_ocr = SimpleNamespace(ocr=Mock(return_value="解救商船II"))
+    image = object()
+    assert reader.read_name(image) == "解救商船Ⅱ"
+    reader.name_ocr.ocr.assert_called_once_with(image)
 
 
 def test_identical_complete_records_are_deduplicated_within_a_group():
