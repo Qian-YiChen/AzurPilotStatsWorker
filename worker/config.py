@@ -24,25 +24,32 @@ class Config:
     ocr_threads: int = 1
     prefetch_jobs: int = 0
     # Stage pipeline: every stage owns its workers and its queue.
-    download_workers: int = 64
-    verify_workers: int = 4
-    ocr_slots: int = 32
-    deliver_workers: int = 4
-    download_ahead: int = 128
+    download_workers: int = 0
+    verify_workers: int = 0
+    ocr_slots: int = 0
+    deliver_workers: int = 0
+    download_ahead: int = 0
     ocr_processes: int = 0
     pipeline: str = "staged"
+    auto_tune: bool = True
+    work_max_bytes: int = 0
+    memory_cache_bytes: int = 0
 
     def __post_init__(self):
         if not 0 <= self.recognition_workers <= 32 or not 1 <= self.ocr_threads <= 16 or not 0 <= self.prefetch_jobs <= 32:
             raise ValueError('Invalid recognition concurrency')
-        if not 1 <= self.download_workers <= 256 or not 1 <= self.verify_workers <= 32:
+        if not 0 <= self.download_workers <= 256 or not 0 <= self.verify_workers <= 32:
             raise ValueError('Invalid download/verify concurrency')
-        if not 1 <= self.ocr_slots <= 128 or not 1 <= self.deliver_workers <= 32:
+        if not 0 <= self.ocr_slots <= 128 or not 0 <= self.deliver_workers <= 32:
             raise ValueError('Invalid ocr/delivery concurrency')
         if not 0 <= self.ocr_processes <= 64:
             raise ValueError('Invalid recognizer process count')
-        if not 1 <= self.download_ahead <= 1024:
+        if not 0 <= self.download_ahead <= 1024:
             raise ValueError('Invalid download-ahead group limit')
+        if self.work_max_bytes < 0 or (self.work_max_bytes and self.work_max_bytes < self.group_bytes):
+            raise ValueError('Work budget must fit at least one maximum-size group')
+        if self.memory_cache_bytes < -1:
+            raise ValueError('Invalid memory cache limit')
         if self.pipeline not in ('staged', 'inline'):
             raise ValueError('PIPELINE must be staged or inline')
         if self.file_bytes < 8 or self.group_bytes < self.file_bytes:
@@ -85,11 +92,14 @@ class Config:
             int(os.getenv('RECOGNITION_WORKERS', '0')),
             int(os.getenv('OCR_THREADS', '1')),
             int(os.getenv('PREFETCH_JOBS', '0')),
-            int(os.getenv('DOWNLOAD_WORKERS', '64')),
-            int(os.getenv('VERIFY_WORKERS', '4')),
-            int(os.getenv('OCR_SLOTS', '32')),
-            int(os.getenv('DELIVER_WORKERS', '4')),
-            int(os.getenv('DOWNLOAD_AHEAD', '128')),
+            int(os.getenv('DOWNLOAD_WORKERS', '0')),
+            int(os.getenv('VERIFY_WORKERS', '0')),
+            int(os.getenv('OCR_SLOTS', '0')),
+            int(os.getenv('DELIVER_WORKERS', '0')),
+            int(os.getenv('DOWNLOAD_AHEAD', '0')),
             int(os.getenv('OCR_PROCESSES', '0')),
             os.getenv('PIPELINE', 'staged'),
+            os.getenv('AUTO_TUNE', 'true').lower() in ('1', 'true', 'yes'),
+            int(os.getenv('WORK_MAX_BYTES', '0')),
+            int(os.getenv('MEMORY_CACHE_BYTES', '0')),
         )

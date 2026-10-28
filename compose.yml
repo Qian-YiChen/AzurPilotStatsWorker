@@ -13,6 +13,7 @@ services:
     ports: ["127.0.0.1:8091:8091"]
     volumes: ["worker-state:/data"]
     stop_grace_period: 12m
+    shm_size: 512m
     logging:
       driver: json-file
       options: {max-size: "10m", max-file: "3"}

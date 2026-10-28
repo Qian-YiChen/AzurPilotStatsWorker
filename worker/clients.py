@@ -3,6 +3,7 @@ import logging
 import time
 import threading
 import re
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from urllib.parse import urlparse, urljoin
 
@@ -19,6 +20,45 @@ TRANSIENT = (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout, httpx.
 class Retryable(Exception):
     """Transient cloud response; the same original download is attempted again."""
 
+    def __init__(self, message, retry_after=0):
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+def retry_after(response):
+    value = response.headers.get('Retry-After', '')
+    try:
+        return max(0, float(value))
+    except ValueError:
+        try:
+            return max(0, parsedate_to_datetime(value).timestamp() - time.time())
+        except (TypeError, ValueError, OverflowError):
+            return 10
+
+
+class DownloadGate:
+    def init_gate(self):
+        self.gate_lock = threading.Lock()
+        self.gate_until = 0.0
+        self.on_throttle = None
+
+    def wait_gate(self):
+        while True:
+            with self.gate_lock:
+                delay = self.gate_until - time.monotonic()
+            if delay <= 0:
+                return
+            time.sleep(min(delay, 1))
+
+    def check_response(self, response):
+        if response.status_code == 429:
+            delay = max(1, retry_after(response))
+            with self.gate_lock:
+                self.gate_until = max(self.gate_until, time.monotonic() + delay)
+            if self.on_throttle:
+                self.on_throttle(delay)
+            raise Retryable('cloud download HTTP 429', delay)
+
 
 def retrying(operation, attempts=3):
     delay = 0.25
@@ -30,7 +70,7 @@ def retrying(operation, attempts=3):
                 raise
             # Signed download URLs must never reach the logs, so log the type.
             log.warning('download retry attempt=%s error=%s', attempt, type(exc).__name__)
-            time.sleep(delay)
+            time.sleep(max(delay, getattr(exc, 'retry_after', 0)))
             delay *= 2
 
 
@@ -58,7 +98,7 @@ class Statistics:
         return r.json()
 
 
-class Pan:
+class Pan(DownloadGate):
     def __init__(self, config):
         self.config = config
         self.client = httpx.Client(timeout=120, follow_redirects=False)
@@ -66,6 +106,7 @@ class Pan:
         self.expires = 0
         self.last_download = 0
         self.control_lock = threading.RLock()
+        self.init_gate()
 
     def access(self):
         with self.control_lock:
@@ -90,11 +131,13 @@ class Pan:
         retrying(lambda: self._download(url, file, path))
 
     def _download(self, url, file, path: Path):
+        self.wait_gate()
         digest = hashlib.sha256()
         size = 0
         try:
             # Control credentials never accompany the CDN request.
             with self.client.stream("GET", url, follow_redirects=True) as response, path.open("wb") as dst:
+                self.check_response(response)
                 if response.status_code in (429, 500, 502, 503, 504):
                     raise Retryable(f"download HTTP {response.status_code}")
                 response.raise_for_status()
@@ -130,7 +173,7 @@ class Pan:
         return url
 
 
-class WebDAV:
+class WebDAV(DownloadGate):
     """A stores immutable originals as <sha256>.png in this WebDAV directory."""
 
     def __init__(self, config):
@@ -138,7 +181,9 @@ class WebDAV:
         self.base_url = config.webdav_url.rstrip("/") + "/"
         self.origin = httpx.URL(self.base_url)
         self.auth = httpx.BasicAuth(config.webdav_username, config.webdav_password)
-        self.client = httpx.Client(timeout=httpx.Timeout(120, connect=10), follow_redirects=False)
+        self.client = httpx.Client(timeout=httpx.Timeout(60, connect=10), follow_redirects=False,
+                                   limits=httpx.Limits(max_connections=256, max_keepalive_connections=64))
+        self.init_gate()
 
     def download(self, file, path: Path):
         if not re.fullmatch(r"[0-9a-f]{64}", file["sha256"]):
@@ -146,6 +191,7 @@ class WebDAV:
         retrying(lambda: self._download(self.base_url + file["sha256"] + ".png", file, path))
 
     def _download(self, url, file, path: Path):
+        self.wait_gate()
         digest = hashlib.sha256()
         size = 0
         try:
@@ -155,6 +201,7 @@ class WebDAV:
                     raise ValueError("WebDAV redirect must use HTTPS without URL credentials")
                 same_origin = (target.scheme, target.host, target.port) == (self.origin.scheme, self.origin.host, self.origin.port)
                 with self.client.stream("GET", target, auth=self.auth if same_origin else None) as response:
+                    self.check_response(response)
                     if response.is_redirect:
                         location = response.headers.get("Location")
                         if not location:

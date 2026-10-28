@@ -36,6 +36,7 @@ class Database:
     def __init__(self, path, file_bytes=10 * 1024**2, group_bytes=500 * 1024**2):
         self.file_bytes, self.group_bytes = file_bytes, group_bytes
         self.lock = threading.RLock()
+        self._release_cache = None
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.executescript("""
@@ -60,6 +61,9 @@ class Database:
             # Interrupted work is resumed from its durable stage. A job that
             # already stored a final result only needs its delivery retried.
             self.db.execute("UPDATE jobs SET active=0,state=CASE WHEN result IS NOT NULL THEN 'delivery' ELSE 'pending' END WHERE state='processing' OR active=1")
+            # Engine removes originals on startup. Persisted intermediate jobs
+            # must download again; their old files cannot still be assumed valid.
+            self.db.execute("UPDATE jobs SET state='pending',active=0 WHERE state IN ('downloaded','verified','matched','recognized') AND result IS NULL")
             self.db.execute('CREATE INDEX IF NOT EXISTS jobs_active_sha ON jobs(sha) WHERE active=1')
             self.db.execute('CREATE INDEX IF NOT EXISTS jobs_stage ON jobs(state,retry_at)')
 
@@ -106,6 +110,10 @@ class Database:
             else:
                 self.db.execute("UPDATE jobs SET state=?,active=0,error='',attempts=0,partial=? WHERE id=?",
                                 (state, json.dumps(partial), job['id']))
+
+    def unlease(self, job):
+        with self.lock, self.db:
+            self.db.execute('UPDATE jobs SET active=0 WHERE id=?', (job['id'],))
 
     def retry_stage(self, job, state, error):
         attempts = int(job.get('attempts') or 0) + 1
@@ -182,15 +190,20 @@ class Database:
     def set_setting(self, key, value):
         with self.lock, self.db:
             self.db.execute("INSERT INTO settings VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, json.dumps(value)))
+            if key in ('release_id', 'templates'):
+                self._release_cache = None
 
     def release(self):
         with self.lock:
-            return self.setting("release_id", 0), self.setting("templates", [])
+            if self._release_cache is None:
+                self._release_cache = self.setting("release_id", 0), self.setting("templates", [])
+            return self._release_cache
 
     def set_release(self, id_, templates):
         with self.lock, self.db:
             for key, value in (("release_id", id_), ("templates", templates)):
                 self.db.execute("INSERT INTO settings VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, json.dumps(value)))
+            self._release_cache = None
 
     def update_reprocess_command(self, id_):
         with self.lock, self.db:

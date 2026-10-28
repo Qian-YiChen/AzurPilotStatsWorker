@@ -16,6 +16,19 @@ from functools import lru_cache
 _template_cache_installed = False
 
 
+@lru_cache(maxsize=512)
+def published_template(encoded):
+    import cv2
+    import numpy as np
+    raw = base64.b64decode(encoded, validate=True)
+    image = cv2.imdecode(np.frombuffer(raw, dtype=np.uint8), cv2.IMREAD_COLOR)
+    if image is None:
+        raise ValueError('Invalid published template')
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image.flags.writeable = False
+    return image, cv2.mean(image)[:3]
+
+
 def cache_base_templates(item_grid):
     global _template_cache_installed
     if _template_cache_installed:
@@ -131,16 +144,12 @@ def recognize(request):
     for t in request["templates"]:
         if not t["enabled"] or t["scene"] not in (meta["project"], "all"):
             continue
-        raw = base64.b64decode(t["image"], validate=True)
-        image = cv2.imdecode(np.frombuffer(raw, dtype=np.uint8), cv2.IMREAD_COLOR)
-        if image is None:
-            raise ValueError("Invalid published template")
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image, color = published_template(t['image'])
         key = t["item_id"] + "_" + str(int(t["id"][:12], 16))
         overlay[key] = t["id"]
         for grid in grids:
             grid.templates[key] = image
-            grid.colors[key] = cv2.mean(image)[:3]
+            grid.colors[key] = color
             grid.templates_hit[key] = 0
     used = set()
     def track(match):

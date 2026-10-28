@@ -83,7 +83,8 @@ def create_app(config=None, start_engine=True):
                 "stages": db.stage_counts(),
                 "recognition_workers": engine.workers if engine else 0,
                 "job_slots": engine.recognize_slots if engine else 0,
-                "pipeline": config.pipeline}
+                "pipeline": config.pipeline,
+                "performance": engine.performance() if engine else None}
 
     @app.websocket("/internal/v1/batches")
     async def receiver(ws: WebSocket):

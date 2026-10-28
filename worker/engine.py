@@ -11,7 +11,8 @@ import threading
 import time
 
 from .clients import Pan, Statistics, WebDAV
-from .pool import RecognizerPool, stage_processes
+from .pool import RecognizerPool
+from .adaptive import Adaptive
 
 log = logging.getLogger(__name__)
 
@@ -66,18 +67,45 @@ class Engine:
                 shutil.rmtree(path)
             else:
                 path.unlink()
-        self.download_workers = config.download_workers
-        self.verify_workers = config.verify_workers
-        self.recognize_slots = config.ocr_slots
-        self.deliver_workers = config.deliver_workers
-        self.download_ahead = config.download_ahead
-        self.recognize_processes = stage_processes(config.ocr_processes)
+        self.tuning = Adaptive(config)
+        self.download_workers = self.tuning.maximum['download']
+        self.verify_workers = self.tuning.maximum['verify']
+        self.recognize_slots = self.tuning.maximum['recognize']
+        self.deliver_workers = self.tuning.maximum['deliver']
+        self.download_ahead = self.tuning.ahead
+        self.recognize_processes = self.recognize_slots
         self.recognizers = RecognizerPool(self.recognize_processes, config.ocr_threads, stage='recognize')
         self.workers = self.recognize_processes
-        self.executor = ThreadPoolExecutor(
-            max_workers=max(self.download_workers, self.verify_workers, self.deliver_workers) + 4,
-            thread_name_prefix="stage")
+        self.executors = {name: ThreadPoolExecutor(max_workers=limit, thread_name_prefix=name)
+                          for name, limit in self.tuning.maximum.items()}
+        self.executor = self.executors['recognize']  # Inline rollback path.
+        self.scheduler = ThreadPoolExecutor(max_workers=1, thread_name_prefix='leases')
+        self.management = ThreadPoolExecutor(max_workers=3, thread_name_prefix='control')
         self.disk_lock = threading.Lock()
+        self.reservations = {}
+        self.work_limit = config.work_max_bytes or max(config.group_bytes, min(2 * 1024**3, shutil.disk_usage(self.work).free // 4))
+        self.memory_jobs = set()
+        self.memory_work = None
+        self.memory_limit = 0
+        shm = Path('/dev/shm')
+        if config.memory_cache_bytes >= 0 and shm.is_dir():
+            try:
+                usage = shutil.disk_usage(shm)
+                self.memory_limit = min(config.memory_cache_bytes or min(512 * 1024**2, self.tuning.resources.memory // 10),
+                                        usage.total * 3 // 4, max(0, usage.free - 8 * 1024**2))
+                identity = hashlib.sha256(str(config.data).encode()).hexdigest()[:12]
+                self.memory_work = shm / ('azurpilot-' + identity)
+                self.memory_work.mkdir(exist_ok=True)
+                for child in self.memory_work.iterdir():
+                    if child.is_dir():
+                        shutil.rmtree(child)
+                    else:
+                        child.unlink()
+            except OSError:
+                self.memory_work, self.memory_limit = None, 0
+        self.active = dict.fromkeys(self.tuning.maximum, 0)
+        self.wakeups = []
+        self.pan.on_throttle = self.tuning.throttled
         log.info('Pipeline staged: download=%s verify=%s recognize_slots=%s recognize_processes=%s '
                  'deliver=%s download_ahead=%s pipeline=%s',
                  self.download_workers, self.verify_workers, self.recognize_slots,
@@ -88,7 +116,9 @@ class Engine:
         return json.loads(job["source"])
 
     def workdir(self, job):
-        return self.work / str(job["id"])
+        with self.disk_lock:
+            root = self.memory_work if job['id'] in self.memory_jobs else self.work
+        return root / str(job["id"])
 
     def files(self, job):
         source = self.source(job)
@@ -99,11 +129,39 @@ class Engine:
         root = getattr(self, 'work', None)
         if root is None:
             return
-        shutil.rmtree(root / str(job['id']), ignore_errors=True)
+        shutil.rmtree(self.workdir(job), ignore_errors=True)
+        with self.disk_lock:
+            self.reservations.pop(job['id'], None)
+            self.memory_jobs.discard(job['id'])
+
+    def reserve_download(self, job):
+        size = sum(file['size'] for file in self.source(job)['files'])
+        with self.disk_lock:
+            reserved = sum(self.reservations.values())
+            if (reserved + size > self.work_limit
+                    or shutil.disk_usage(self.work).free - reserved - size < 128 * 1024**2):
+                return False
+            cached = sum(value for id_, value in self.reservations.items() if id_ in self.memory_jobs)
+            if (self.memory_work is not None and cached + size <= self.memory_limit
+                    and self.tuning.pressure['memory'] < .8
+                    and shutil.disk_usage(self.memory_work).free - cached - size >= 8 * 1024**2):
+                self.memory_jobs.add(job['id'])
+            self.reservations[job['id']] = size
+            return True
+
+    def performance(self):
+        result = self.tuning.snapshot()
+        with self.disk_lock:
+            result['work_reserved'] = sum(self.reservations.values())
+            result['memory_cached'] = sum(value for id_, value in self.reservations.items() if id_ in self.memory_jobs)
+            result['memory_cache_limit'] = self.memory_limit
+        result.update(work_limit=self.work_limit, active=dict(self.active),
+                      resident_processes=len(self.recognizers.processes))
+        return result
 
     def fail(self, job, state, stage, error):
         attempts = int(job.get('attempts') or 0) + 1
-        if attempts >= MAX_STAGE_ATTEMPTS:
+        if attempts >= MAX_STAGE_ATTEMPTS and stage != 'deliver':
             self.db.quarantine(job, f'{stage}: {error}')
             self.cleanup(job)
             log.error('stage=%s quarantined job=%s attempts=%s error=%s',
@@ -112,6 +170,7 @@ class Engine:
             self.db.retry_stage(job, state, f'{stage}: {error}')
             log.warning('stage=%s retry job=%s attempts=%s error=%s',
                         stage, job['id'], attempts, str(error)[:300])
+        return False
 
     def run_recognizer(self, request, job, stage):
         directory = self.workdir(job)
@@ -143,11 +202,14 @@ class Engine:
                          source["sha256"], job['id'], file["index"], file["size"], time.monotonic() - one,
                          "webdav" if self.config.webdav_url else "openapi")
             self.db.timed(job, 'download_ms', (time.monotonic() - started) * 1000)
-            self.db.advance(job, 'downloaded')
+            # Both download transports validate every byte before returning.
+            # Do not re-read and hash the same PNG a second time in another pool.
+            self.db.advance(job, 'verified')
             log.info('stage=download complete sha=%s job=%s files=%s seconds=%.3f',
                      source["sha256"], job['id'], len(source["files"]), time.monotonic() - started)
         except Exception as error:
-            self.fail(job, 'pending', 'download', error)
+            self.cleanup(job)
+            return self.fail(job, 'pending', 'download', error)
 
     def stage_verify(self, job):
         source = self.source(job)
@@ -170,7 +232,8 @@ class Engine:
             log.info('stage=verify sha=%s job=%s files=%s bytes=%s seconds=%.3f',
                      source["sha256"], job['id'], len(source["files"]), total, time.monotonic() - started)
         except Exception as error:
-            self.fail(job, 'pending', 'verify', error)
+            self.cleanup(job)
+            return self.fail(job, 'pending', 'verify', error)
 
     def stage_recognize(self, job):
         source = self.source(job)
@@ -187,7 +250,9 @@ class Engine:
             if set(overrides) - {"project", "scene"} or any(not isinstance(v, str) or len(v) > 128 for v in overrides.values()):
                 raise ValueError("Invalid inferred metadata")
             source["metadata"].update(overrides)
-            revision = self.stats.revision(source["sha256"]) + 1
+            # Network requests belong to delivery, never occupy an OCR slot.
+            # Revision 0 is a local, durable "not allocated yet" marker.
+            revision = 0
             result = {"sha256": source["sha256"], "revision": revision, "status": parsed["status"],
                       "parser_version": "azurpilot-adapter-v2",
                       "template_release": release_id, "source": source,
@@ -196,13 +261,15 @@ class Engine:
                       "used_templates": parsed["used_templates"]}
             self.db.timed(job, 'ocr_ms', elapsed * 1000)
             self.db.save_result(job, result, parsed["candidates"], template_snapshot(templates))
+            self.cleanup(job)
             # Hand the lease to the delivery stage; it is a separate worker.
             self.db.advance(job, 'delivery')
             log.info('stage=recognize sha=%s job=%s status=%s events=%s candidates=%s revision=%s seconds=%.3f',
                      source["sha256"], job['id'], parsed["status"], len(parsed["events"]),
                      len(parsed["candidates"]), revision, elapsed)
         except Exception as error:
-            self.fail(job, 'verified', 'recognize', error)
+            self.cleanup(job)
+            return self.fail(job, 'pending', 'recognize', error)
 
     def deliver(self, job, source, result, candidates, snapshot):
         for candidate in candidates:
@@ -223,6 +290,7 @@ class Engine:
         else:
             self.db.quarantine(job, json.dumps(ack, ensure_ascii=False))
             log.error('stage=deliver rejected sha=%s receipt=%s error=%s', source["sha256"], ack["status"], ack.get("error", ""))
+            return False
 
     def stage_deliver(self, job):
         source = self.source(job)
@@ -231,12 +299,16 @@ class Engine:
             result = json.loads(job["result"])
             candidates = json.loads(job["candidates"] or "[]")
         except (TypeError, ValueError) as error:
-            self.fail(job, 'delivery', 'deliver', error)
-            return
+            return self.fail(job, 'delivery', 'deliver', error)
         try:
-            self.deliver(job, source, result, candidates, snapshot)
+            if not result.get('revision'):
+                result['revision'] = self.stats.revision(source['sha256']) + 1
+                # Persist before sending so a lost HTTP response reuses the
+                # same revision instead of adding another statistics version.
+                self.db.save_result(job, result, candidates, snapshot)
+            return self.deliver(job, source, result, candidates, snapshot)
         except Exception as error:
-            self.fail(job, 'delivery', 'deliver', error)
+            return self.fail(job, 'delivery', 'deliver', error)
         finally:
             if job["task"].startswith("command:"):
                 self.db.update_reprocess_command(int(job["task"].split(":")[1]))
@@ -333,46 +405,76 @@ class Engine:
 
     # ---- scheduler ------------------------------------------------------
     def stage(self, loop, name, state, slots, handler, budget=None):
-        queue = asyncio.Queue(maxsize=slots)
+        wake = asyncio.Event()
+        self.wakeups.append(wake)
+        running = set()
 
         async def execute(function, *args):
-            future = loop.run_in_executor(self.executor, function, *args)
+            future = loop.run_in_executor(self.executors[name], function, *args)
             try:
                 return await asyncio.shield(future)
             except asyncio.CancelledError:
                 await future  # Drain leases/results before closing SQLite or HTTP.
                 raise
 
-        async def claim():
-            while True:
-                if budget is not None and not budget():
-                    await asyncio.sleep(0.5)
-                    continue
-                try:
-                    job = await loop.run_in_executor(None, self.db.claim_stage, state)
-                except Exception:
-                    log.exception('stage=%s claim failed', name)
-                    await asyncio.sleep(1)
-                    continue
-                if job is None:
-                    await asyncio.sleep(0.25)
-                    continue
-                await queue.put(job)
+        async def consume(job):
+            started = time.monotonic()
+            self.active[name] += 1
+            succeeded = False
+            try:
+                succeeded = await execute(handler, job) is not False
+            except Exception:
+                log.exception('stage=%s worker failed unexpectedly', name)
+                if name in ('download', 'verify', 'recognize'):
+                    self.cleanup(job)
+                await loop.run_in_executor(self.scheduler, self.fail, job,
+                                           'pending' if name != 'deliver' else state,
+                                           name, 'unexpected worker failure')
+            finally:
+                self.active[name] -= 1
+                self.tuning.observe(name, time.monotonic() - started,
+                                    len(self.source(job)['files']), failed=not succeeded)
+                for event in self.wakeups:
+                    event.set()
 
-        async def consume():
-            while True:
-                job = await queue.get()
-                try:
-                    await execute(handler, job)
-                except Exception:
-                    log.exception('stage=%s worker failed unexpectedly', name)
-                    self.fail(job, state, name, 'unexpected worker failure')
-                finally:
-                    queue.task_done()
+        async def dispatch():
+            try:
+                while True:
+                    wake.clear()
+                    ready = len(running) < self.tuning.limit(name)
+                    if name == 'download':
+                        ready = ready and self.tuning.download_ready()
+                    job = None
+                    try:
+                        if ready and budget is not None:
+                            ready = await loop.run_in_executor(self.scheduler, budget)
+                        if ready:
+                            job = await loop.run_in_executor(self.scheduler, self.db.claim_stage, state)
+                    except Exception:
+                        log.exception('stage=%s claim failed', name)
+                        await asyncio.sleep(1)
+                        continue
+                    if job:
+                        if name == 'download' and not await loop.run_in_executor(self.scheduler, self.reserve_download, job):
+                            await loop.run_in_executor(self.scheduler, self.db.unlease, job)
+                        else:
+                            task = asyncio.create_task(consume(job))
+                            running.add(task)
+                            def finished(done):
+                                running.discard(done)
+                                wake.set()
+                            task.add_done_callback(finished)
+                            continue
+                    try:
+                        await asyncio.wait_for(wake.wait(), timeout=.25)
+                    except asyncio.TimeoutError:
+                        pass
+            finally:
+                # Finish only already-running work, without pre-leasing a
+                # second queue of jobs that can starve other stages.
+                await asyncio.gather(*running, return_exceptions=True)
 
-        tasks = [asyncio.create_task(claim())]
-        tasks.extend(asyncio.create_task(consume()) for _ in range(slots))
-        return tasks
+        return [asyncio.create_task(dispatch())]
 
     async def run(self):
         loop = asyncio.get_running_loop()
@@ -381,9 +483,9 @@ class Engine:
 
         async def control_worker():
             while True:
-                command = await loop.run_in_executor(None, self.db.command)
+                command = await loop.run_in_executor(self.management, self.db.command)
                 if command:
-                    future = loop.run_in_executor(None, self.control, command)
+                    future = loop.run_in_executor(self.management, self.control, command)
                     try:
                         await asyncio.shield(future)
                     except asyncio.CancelledError:
@@ -395,7 +497,7 @@ class Engine:
         async def management():
             while True:
                 try:
-                    sync = loop.run_in_executor(None, self.synchronize)
+                    sync = loop.run_in_executor(self.management, self.synchronize)
                     try:
                         await asyncio.shield(sync)
                     except asyncio.CancelledError:
@@ -409,12 +511,19 @@ class Engine:
             return self.db.count_states(('downloaded', 'verified')) < self.download_ahead
 
         async def reporter():
+            report_at = 0
             while True:
-                counts = self.db.stage_counts()
-                log.info('stage=depth pending=%s downloaded=%s verified=%s delivery=%s done=%s failed=%s',
-                         counts.get('pending', 0), counts.get('downloaded', 0), counts.get('verified', 0),
-                         counts.get('delivery', 0), counts.get('done', 0), counts.get('failed', 0))
-                await asyncio.sleep(30)
+                counts = await loop.run_in_executor(self.scheduler, self.db.stage_counts)
+                await loop.run_in_executor(self.management, self.tuning.adjust, counts)
+                if self.tuning.pressure['memory'] >= .85:
+                    await loop.run_in_executor(self.management, self.recognizers.trim_idle,
+                                               self.tuning.limit('recognize'))
+                for event in self.wakeups:
+                    event.set()
+                if time.monotonic() >= report_at:
+                    log.info('stage=depth counts=%s performance=%s', counts, self.performance())
+                    report_at = time.monotonic() + 30
+                await asyncio.sleep(5)
 
         tasks = [asyncio.create_task(management()), asyncio.create_task(control_worker()),
                  asyncio.create_task(reporter())]
@@ -428,7 +537,8 @@ class Engine:
             for task in tasks:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
-            self.executor.shutdown(wait=True)
+            for executor in (*self.executors.values(), self.scheduler, self.management):
+                executor.shutdown(wait=True)
             self.recognizers.close()
             self.stats.client.close()
             self.pan.client.close()
@@ -472,7 +582,8 @@ class Engine:
             for task in tasks:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
-            self.executor.shutdown(wait=True)
+            for executor in (*self.executors.values(), self.scheduler, self.management):
+                executor.shutdown(wait=True)
             self.recognizers.close()
             self.stats.client.close()
             self.pan.client.close()

@@ -20,6 +20,10 @@ def hardware():
     """CPU count and memory budget for the worker pools."""
     cpus = getattr(os, 'process_cpu_count', os.cpu_count)() or 1
     try:
+        cpus = min(cpus, len(os.sched_getaffinity(0)))
+    except (AttributeError, OSError):
+        pass
+    try:
         quota, period = Path('/sys/fs/cgroup/cpu.max').read_text().split()
         if quota != 'max':
             cpus = min(cpus, max(1, math.ceil(int(quota) / int(period))))
@@ -104,6 +108,11 @@ class RecognizerPool:
                     text=True, encoding='utf-8', env=env,
                 )
                 process.region = region
+                if hasattr(os, 'setpriority'):
+                    try:
+                        os.setpriority(os.PRIO_PROCESS, process.pid, 5)
+                    except OSError:
+                        pass
                 with self.lock:
                     self.processes.add(process)
             process.stdin.write(json.dumps([str(input_path), str(output_path)]) + '\n')
@@ -133,3 +142,20 @@ class RecognizerPool:
             processes = list(self.processes)
         for process in processes:
             self._stop(process)
+
+    def trim_idle(self, keep):
+        """Retire only idle models on memory pressure; running jobs finish."""
+        idle = []
+        try:
+            for _ in range(self.slots.qsize()):
+                try:
+                    process = self.slots.get_nowait()
+                except queue.Empty:
+                    break
+                if process is not None and len(self.processes) > keep:
+                    self._stop(process)
+                    process = None
+                idle.append(process)
+        finally:
+            for process in idle:
+                self.slots.put(process)
