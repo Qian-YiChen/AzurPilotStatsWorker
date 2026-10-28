@@ -16,6 +16,25 @@ from functools import lru_cache
 _template_cache_installed = False
 
 
+def item_candidate(item, sample_sha256, metadata, file_index, frame_index, slot):
+    import cv2
+    icon = item.image[21:70, 40:89]
+    ok, encoded = cv2.imencode(".png", cv2.cvtColor(icon, cv2.COLOR_RGB2BGR))
+    if not ok:
+        raise ValueError("Candidate encoding failed")
+    raw = encoded.tobytes()
+    return {
+        "id": hashlib.sha256(raw).hexdigest(),
+        "scene": metadata["project"],
+        "image": base64.b64encode(raw).decode(),
+        "sample_sha256": sample_sha256,
+        "occurrence": f"{file_index}:{frame_index}:{slot}",
+        "metadata": {"file_index": file_index, "frame_index": frame_index, "slot": slot,
+                     "box": [int(v) for v in item._button.area], "server": metadata["server"],
+                     "scene": metadata["scene"], "amount": int(item.amount)},
+    }
+
+
 def cache_base_templates(item_grid):
     global _template_cache_installed
     if _template_cache_installed:
@@ -160,13 +179,16 @@ def recognize(request):
         return tracked_match
     for grid in grids:
         grid.match_template = track(grid.match_template)
+    def build_candidate(item, file_index, frame_index, slot):
+        return item_candidate(item, source["sha256"], meta, file_index, frame_index, slot)
     if not research and meta["scene"].startswith("commission"):
         if __package__:
             from .commission import NativeCommissionReader, recognize_commissions
         else:
             from commission import NativeCommissionReader, recognize_commissions
         return recognize_commissions(frames(request["files"], diagnostics, recover=True),
-                                     NativeCommissionReader(stats, meta["server"]), used, diagnostics)
+                                     NativeCommissionReader(stats, meta["server"]), used, diagnostics,
+                                     build_candidate)
     candidates = []
     events = []
     # Repeated reward pages can overlap. The upstream merger identifies the
@@ -218,14 +240,9 @@ def recognize(request):
         reward_frames += 1
         for slot, item in enumerate(found):
             if not item.is_known_item():
-                icon = item.image[21:70, 40:89]
-                ok, encoded = cv2.imencode(".png", cv2.cvtColor(icon, cv2.COLOR_RGB2BGR))
-                if not ok:
-                    raise ValueError("Candidate encoding failed")
-                raw = encoded.tobytes()
-                id_ = hashlib.sha256(raw).hexdigest()
-                candidates.append({"id": id_, "scene": meta["project"], "image": base64.b64encode(raw).decode(), "sample_sha256": source["sha256"], "occurrence": f"{file_index}:{frame_index}:{slot}", "metadata": {"file_index": file_index, "frame_index": frame_index, "slot": slot, "box": [int(v) for v in item._button.area], "server": meta["server"], "scene": meta["scene"], "amount": int(item.amount)}})
-                diagnostics.append("missing_template:" + id_)
+                candidate = build_candidate(item, file_index, frame_index, slot)
+                candidates.append(candidate)
+                diagnostics.append("missing_template:" + candidate["id"])
             elif item.amount <= 0:
                 diagnostics.append("invalid_amount:" + item.name)
             else:
