@@ -7,7 +7,7 @@ import pytest
 from worker.commission import recognize_commissions, resolve_name
 from worker.db import Database
 from worker.engine import Engine
-from worker.recognize import frames
+from worker.recognize import frames, run_request
 from test_worker import batch
 
 
@@ -94,6 +94,43 @@ def test_deduplication_is_independent_of_item_order_and_request_history():
     assert len(parse(images)["events"]) == 1
 
 
+@pytest.mark.parametrize("left,right,expected_events", [
+    ([1, 2], [3], 2),
+    ([1, 1], [2], 2),
+    ([1, 2], [2, 1], 1),
+])
+def test_deduplication_uses_original_reward_entries_before_output_merging(left, right, expected_events):
+    result = parse([success(), reward([item(amount=amount) for amount in left]),
+                    success(), reward([item(amount=amount) for amount in right])])
+    assert len(result["events"]) == expected_events
+    assert result["status"] == "complete"
+    # C requires one item/tag row per event, even when the original entries differ.
+    assert result["events"][0]["items"] == [{"item": "Coins", "tag": "", "amount": sum(left)}]
+    assert result["events"][-1]["items"] == [{"item": "Coins", "tag": "", "amount": sum(right)}]
+
+
+def test_event_limit_keeps_valid_results_through_request_serialization(tmp_path, monkeypatch):
+    images = []
+    for amount in range(1, 1002):
+        images.extend([success(), reward([item(amount=amount)])])
+
+    def recognize(_request):
+        # 2,002 frames fit in 201 vertically packed files, below the source limit.
+        return recognize_commissions(((i // 10, i % 10, image) for i, image in enumerate(images)),
+                                     Reader(), set(), [])
+
+    monkeypatch.setattr("worker.recognize.recognize", recognize)
+    source, target = tmp_path / "input.json", tmp_path / "output.json"
+    source.write_text("{}", encoding="utf-8")
+    run_request(source, target)
+    result = json.loads(target.read_text(encoding="utf-8"))
+    assert result["status"] == "complete"
+    assert len(result["events"]) == 1000
+    assert [event["items"][0]["amount"] for event in result["events"]] == list(range(1, 1001))
+    assert result["diagnostics"] == []
+    assert any(entry["reason"] == "commission_event_limit" for entry in result["skipped_frames"])
+
+
 def test_missing_reward_does_not_shift_later_pairing():
     result = parse([success("first"), success("second"), reward(), success("third"), reward()])
     assert [event["project"] for event in result["events"]] == ["second", "third"]
@@ -159,6 +196,19 @@ def test_zero_successes_have_no_events_and_keep_failure_diagnostics():
     assert result["events"] == []
     assert result["status"] == "needs_review"
     assert "no_complete_commission" in result["diagnostics"]
+
+
+def test_unclassified_frame_without_valid_events_requires_review():
+    result = parse([{"kind": "unknown"}])
+    assert result["events"] == []
+    assert result["status"] == "needs_review"
+    assert "unclassified_frame" in result["diagnostics"]
+
+
+def test_recognition_failure_status_survives_skipped_detail_limit():
+    result = parse([reward()] * 1000 + [{"kind": "unknown"}])
+    assert len(result["skipped_frames"]) == 1000
+    assert result["status"] == "needs_review"
 
 
 def test_corrupt_file_and_bad_size_keep_their_sequence_positions(tmp_path):

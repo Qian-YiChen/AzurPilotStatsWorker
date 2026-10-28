@@ -95,8 +95,14 @@ def recognize_commissions(frame_iterator, reader, used_templates, diagnostics):
     events, skipped = [], []
     pending = None
     seen = set()
+    recognition_failed = False
 
     def skip(location, reason):
+        nonlocal recognition_failed
+        # Classification must not depend on whether the bounded log is full.
+        if reason.startswith(("commission_name_error:", "commission_reward_error:",
+                              "classification_error:", "unreadable_frame", "unclassified_frame")):
+            recognition_failed = True
         if len(skipped) < 1000:
             skipped.append({"file_index": location[0], "frame_index": location[1], "reason": reason})
 
@@ -110,16 +116,16 @@ def recognize_commissions(frame_iterator, reader, used_templates, diagnostics):
             return
         if current["name"] is None or current["items"] is None:
             return
-        signature = (current["status"], current["name"],
-                     tuple((entry["item"], entry["tag"], entry["amount"]) for entry in current["items"]))
+        signature = current["status"], current["name"], current["reward_entries"]
         if signature in seen:
             skip(current["location"], "duplicate_commission")
+            return
+        if len(events) >= 1000:
+            skip(current["location"], "commission_event_limit")
             return
         seen.add(signature)
         events.append({"event_type": "drop", "series": 0, "project": current["name"], "focus_series": 0,
                        "duration_seconds": 0, "items": current["items"]})
-        if len(events) > 1000:
-            raise ValueError("Recognition output exceeds safety limit")
 
     for file_index, frame_index, image in frame_iterator:
         location = file_index, frame_index
@@ -135,7 +141,8 @@ def recognize_commissions(frame_iterator, reader, used_templates, diagnostics):
             continue
         if kind in ("success", "perfect"):
             finish_pending()
-            pending = {"location": location, "status": kind, "name": None, "reward_count": 0, "items": None}
+            pending = {"location": location, "status": kind, "name": None, "reward_count": 0,
+                       "items": None, "reward_entries": None}
             try:
                 pending["name"] = reader.read_name(image)
             except Exception as exc:
@@ -162,6 +169,7 @@ def recognize_commissions(frame_iterator, reader, used_templates, diagnostics):
             if not found:
                 raise ValueError("empty_reward")
             merged = {}
+            original_entries = []
             for item in found:
                 if not item.is_known_item():
                     raise ValueError("unknown_item")
@@ -169,9 +177,13 @@ def recognize_commissions(frame_iterator, reader, used_templates, diagnostics):
                 if not 0 < amount <= 1_000_000_000:
                     raise ValueError("invalid_amount")
                 key = item.name, item.tag or ""
+                original_entries.append((*key, amount))
                 merged[key] = merged.get(key, 0) + amount
                 if merged[key] > 1_000_000_000:
                     raise ValueError("invalid_amount")
+            # Keep the original multiset for deduplication; only C's output rows
+            # merge equal item/tag keys to satisfy its event validation rules.
+            pending["reward_entries"] = tuple(sorted(original_entries))
             pending["items"] = [{"item": name, "tag": tag, "amount": amount}
                                 for (name, tag), amount in sorted(merged.items())]
         except Exception as exc:
@@ -181,9 +193,7 @@ def recognize_commissions(frame_iterator, reader, used_templates, diagnostics):
             continue
     finish_pending()
     failures = sorted(set(diagnostics + [entry["reason"] for entry in skipped]))
-    recognition_failed = bool(diagnostics) or any(entry["reason"].startswith(
-        ("commission_name_error:", "commission_reward_error:", "classification_error:", "unreadable_frame"))
-        for entry in skipped)
+    recognition_failed = recognition_failed or bool(diagnostics)
     return {"events": events, "diagnostics": [] if events else (failures + ["no_complete_commission"])[:1000],
             "candidates": [], "used_templates": sorted(used_templates),
             "status": "complete" if events else "needs_review" if recognition_failed else "invalid",
